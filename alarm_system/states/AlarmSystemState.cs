@@ -23,6 +23,11 @@ namespace alarm_system.states
             Context.ChangeState(this.StateType, newStateType);
         }
 
+        internal virtual void GotActive()
+        {
+            Console.WriteLine(this.GetType().Name + " is active now!");
+        }
+
         internal virtual void Open()
         {
             Console.WriteLine(this.GetType().Name + " has no Open Command. Ignore.");

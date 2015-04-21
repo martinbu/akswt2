@@ -14,8 +14,7 @@ namespace alarm_system
         ClosedAndLocked,
         Armed,
         SilentAndOpen,
-        Alarm,
-        FlashAndSound,
-        Flash
+        AlarmFlashAndSound,
+        AlarmFlash
     }
 }

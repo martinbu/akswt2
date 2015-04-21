@@ -16,8 +16,13 @@ namespace alarm_system
         {
             AlarmSystemStates = new Dictionary<AlarmSystemStateType, AlarmSystemState>();
             AddState(new OpenAndUnlockedState(this));
-            AddState(new ClosedAndUnlockedState(this));
             AddState(new OpenAndLockedState(this));
+            AddState(new ClosedAndUnlockedState(this));
+            AddState(new ClosedAndLockedState(this));
+            AddState(new ArmedState(this));
+            AddState(new SilentAndOpenState(this));
+            AddState(new AlarmFlashAndSoundState(this));
+            AddState(new AlarmFlashState(this));
         }
 
         public AlarmSystemStateType CurrentStateType { get; private set; }
@@ -48,6 +53,7 @@ namespace alarm_system
                 return;
 
             CurrentStateType = newStateType;
+            AlarmSystemStates[CurrentStateType].GotActive();
 
             if (StateChanged != null)
             {
