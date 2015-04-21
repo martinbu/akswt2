@@ -83,6 +83,13 @@
     <None Include="packages.config" />
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\alarm_system\alarm_system.csproj">
+      <Name>alarm_system</Name>
+      <Project>{16646c44-3ec7-429a-a74e-9d217f4ae084}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '11.0'">
       <PropertyGroup Condition="Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')">
