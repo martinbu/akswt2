@@ -12,6 +12,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{DC9997
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "alarm_system", "alarm_system\alarm_system.csproj", "{16646C44-3EC7-429A-A74E-9D217F4AE084}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlarmSystemInterface", "AlarmSystemInterface\AlarmSystemInterface.csproj", "{B597D923-67AA-4393-BF6F-ECD0724B6C49}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +28,10 @@ Global
 		{16646C44-3EC7-429A-A74E-9D217F4AE084}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{16646C44-3EC7-429A-A74E-9D217F4AE084}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{16646C44-3EC7-429A-A74E-9D217F4AE084}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B597D923-67AA-4393-BF6F-ECD0724B6C49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B597D923-67AA-4393-BF6F-ECD0724B6C49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B597D923-67AA-4393-BF6F-ECD0724B6C49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B597D923-67AA-4393-BF6F-ECD0724B6C49}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
