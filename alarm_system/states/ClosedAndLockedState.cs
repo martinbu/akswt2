@@ -12,19 +12,20 @@ namespace alarm_system.states
         internal ClosedAndLockedState(Context context)
             : base(context, AlarmSystemStateType.ClosedAndLocked)
         {
+            CancelArmedActivation();
         }
 
-        private CancellationTokenSource cancelArmedActivation = new CancellationTokenSource();
+        private CancellationTokenSource cancelArmedActivation = null;
 
         internal override void Unlock()
         {
-            cancelArmedActivation.Cancel();
+            CancelArmedActivation();
             base.ChangeStateTo(AlarmSystemStateType.ClosedAndUnlocked);
         }
 
         internal override void Open()
         {
-            cancelArmedActivation.Cancel();
+            CancelArmedActivation();
             base.ChangeStateTo(AlarmSystemStateType.OpenAndLocked);
         }
 
@@ -36,8 +37,23 @@ namespace alarm_system.states
 
         private async void armeSystem()
         {
-            await Task.Delay(TimeSpan.FromSeconds(20));
-            ChangeStateTo(AlarmSystemStateType.Armed);
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(20), cancelArmedActivation.Token);
+                ChangeStateTo(AlarmSystemStateType.Armed);
+            }
+            catch (TaskCanceledException) { }
+        }
+
+        private void CancelArmedActivation()
+        {
+            if (cancelArmedActivation != null)
+            {
+                cancelArmedActivation.Cancel();
+                cancelArmedActivation.Dispose();
+            }
+
+            cancelArmedActivation = new CancellationTokenSource();
         }
     }
 }

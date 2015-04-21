@@ -12,13 +12,14 @@ namespace alarm_system.states
         internal AlarmFlashAndSoundState(Context context)
             : base(context, AlarmSystemStateType.AlarmFlashAndSound)
         {
+            CancelAlarm();
         }
 
-        private CancellationTokenSource cancelAlarm = new CancellationTokenSource();
+        private CancellationTokenSource cancelAlarm = null;
 
         internal override void Unlock()
         {
-            cancelAlarm.Cancel();
+            CancelAlarm();
             base.ChangeStateTo(AlarmSystemStateType.OpenAndUnlocked);
         }
 
@@ -30,8 +31,21 @@ namespace alarm_system.states
 
         private async void turnOffSound()
         {
-            await Task.Delay(TimeSpan.FromSeconds(30));
-            ChangeStateTo(AlarmSystemStateType.AlarmFlash);
+            try {
+                await Task.Delay(TimeSpan.FromSeconds(30), cancelAlarm.Token);
+                ChangeStateTo(AlarmSystemStateType.AlarmFlash);
+            }
+            catch (TaskCanceledException) { }
+        }
+
+        private void CancelAlarm() {
+            if (cancelAlarm != null)
+            {
+                cancelAlarm.Cancel();
+                cancelAlarm.Dispose();
+            }
+            
+            cancelAlarm = new CancellationTokenSource();
         }
     }
 }
