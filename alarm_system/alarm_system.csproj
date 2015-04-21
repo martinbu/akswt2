@@ -41,12 +41,15 @@
   <ItemGroup>
     <Compile Include="AlarmSystem.cs" />
     <Compile Include="AlarmSystemImpl.cs" />
+    <Compile Include="AlarmSystemStateType.cs" />
+    <Compile Include="Context.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="AlarmSystemState.cs" />
+    <Compile Include="StateChangedEventArgs.cs" />
+    <Compile Include="states\AlarmSystemState.cs" />
+    <Compile Include="states\ClosedAndLockedState.cs" />
     <Compile Include="states\ClosedAndUnlockedState.cs" />
     <Compile Include="states\OpenAndLockedState.cs" />
     <Compile Include="states\OpenAndUnlockedState.cs" />
-    <Compile Include="UnsupportedStateActionException.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

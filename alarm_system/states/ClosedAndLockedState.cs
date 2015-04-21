@@ -6,19 +6,19 @@ using System.Threading.Tasks;
 
 namespace alarm_system.states
 {
-    internal class OpenAndUnlockedState : AlarmSystemState
+    internal class ClosedAndLockedState : AlarmSystemState
     {
-        internal OpenAndUnlockedState(Context context)
-            : base(context, AlarmSystemStateType.OpenAndUnlocked)
+        internal ClosedAndLockedState(Context context)
+            : base(context, AlarmSystemStateType.ClosedAndLocked)
         {
         }
 
-        internal override void Close()
+        internal override void Unlock()
         {
             base.ChangeStateTo(AlarmSystemStateType.ClosedAndUnlocked);
         }
 
-        internal override void Lock()
+        internal override void Open()
         {
             base.ChangeStateTo(AlarmSystemStateType.OpenAndLocked);
         }

@@ -6,26 +6,21 @@ using System.Threading.Tasks;
 
 namespace alarm_system.states
 {
-    class ClosedAndUnlockedState : AlarmSystemState
+    internal class ClosedAndUnlockedState : AlarmSystemState
     {
-        public void Open()
+        internal ClosedAndUnlockedState(Context context)
+            : base(context, AlarmSystemStateType.ClosedAndUnlocked)
         {
-            throw new UnsupportedStateActionException(this, "Open");
         }
 
-        public void Close()
+        internal override void Open()
         {
-            throw new UnsupportedStateActionException(this, "Close");
+            base.ChangeStateTo(AlarmSystemStateType.OpenAndUnlocked);   
         }
 
-        public void Lock()
+        internal override void Lock()
         {
-            throw new UnsupportedStateActionException(this, "Lock");
-        }
-
-        public void Unlock()
-        {
-            throw new UnsupportedStateActionException(this, "Unlock");
+            base.ChangeStateTo(AlarmSystemStateType.ClosedAndLocked);
         }
     }
 }
