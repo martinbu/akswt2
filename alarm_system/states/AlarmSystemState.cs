@@ -47,5 +47,9 @@ namespace alarm_system.states
         {
             Console.WriteLine(this.GetType().Name + " has no Unlock Command. Ignore.");
         }
+
+        internal virtual void ShutDown()
+        {
+        }
     }
 }

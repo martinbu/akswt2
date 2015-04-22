@@ -43,6 +43,7 @@ namespace alarm_system.states
                 ChangeStateTo(AlarmSystemStateType.Armed);
             }
             catch (TaskCanceledException) { }
+            catch (ObjectDisposedException) { }
         }
 
         private void CancelArmedActivation()
@@ -54,6 +55,11 @@ namespace alarm_system.states
             }
 
             cancelArmedActivation = new CancellationTokenSource();
+        }
+
+        internal override void ShutDown()
+        {
+            CancelArmedActivation();
         }
     }
 }

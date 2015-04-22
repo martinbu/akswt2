@@ -36,6 +36,7 @@ namespace alarm_system.states
                 ChangeStateTo(AlarmSystemStateType.AlarmFlash);
             }
             catch (TaskCanceledException) { }
+            catch (ObjectDisposedException) { }
         }
 
         private void CancelAlarm() {
@@ -46,6 +47,11 @@ namespace alarm_system.states
             }
             
             cancelAlarm = new CancellationTokenSource();
+        }
+
+        internal override void ShutDown()
+        {
+            CancelAlarm();
         }
     }
 }

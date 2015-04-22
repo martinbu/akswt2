@@ -20,6 +20,7 @@ namespace alarm_system
         void Lock();
 
         void Unlock();
-        
+
+        void ShutDown();
     }
 }

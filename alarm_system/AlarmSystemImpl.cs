@@ -12,6 +12,8 @@ namespace alarm_system
 
         private Dictionary<AlarmSystemStateType, AlarmSystemState> AlarmSystemStates { get; set; }
 
+        private static List<AlarmSystem> initializedAlarmSystem = new List<AlarmSystem>();
+
         public AlarmSystemImpl()
         {
             AlarmSystemStates = new Dictionary<AlarmSystemStateType, AlarmSystemState>();
@@ -23,6 +25,10 @@ namespace alarm_system
             AddState(new SilentAndOpenState(this));
             AddState(new AlarmFlashAndSoundState(this));
             AddState(new AlarmFlashState(this));
+
+            CurrentStateType = AlarmSystemStateType.OpenAndUnlocked;
+
+            initializedAlarmSystem.Add(this);
         }
 
         public AlarmSystemStateType CurrentStateType { get; private set; }
@@ -70,5 +76,17 @@ namespace alarm_system
 
 
         public event EventHandler<StateChangedEventArgs> StateChanged;
+
+
+        public void ShutDown()
+        {
+            AlarmSystemStates.Values.ToList().ForEach(e => e.ShutDown());
+        }
+
+        public static void ShutDownAll()
+        {
+            Console.WriteLine("Shut down '{0}' AlarmSystems", initializedAlarmSystem.Count);
+            initializedAlarmSystem.ForEach(e => e.ShutDown());
+        }
     }
 }
