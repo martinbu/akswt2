@@ -87,6 +87,8 @@ namespace alarm_system
         {
             Console.WriteLine("Shut down '{0}' AlarmSystems", initializedAlarmSystem.Count);
             initializedAlarmSystem.ForEach(e => e.ShutDown());
+
+            initializedAlarmSystem.Clear();
         }
     }
 }
