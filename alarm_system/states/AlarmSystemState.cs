@@ -1,4 +1,5 @@
-﻿using System;
+﻿using alarm_system_common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -25,27 +26,27 @@ namespace alarm_system.states
 
         internal virtual void GotActive()
         {
-            Console.WriteLine(this.GetType().Name + " is active now!");
+            //Console.WriteLine(this.GetType().Name + " is active now!");
         }
 
         internal virtual void Open()
         {
-            Console.WriteLine(this.GetType().Name + " has no Open Command. Ignore.");
+            //Console.WriteLine(this.GetType().Name + " has no Open Command. Ignore.");
         }
 
         internal virtual void Close()
         {
-            Console.WriteLine(this.GetType().Name + " has no Close Command. Ignore.");
+            //Console.WriteLine(this.GetType().Name + " has no Close Command. Ignore.");
         }
 
         internal virtual void Lock()
         {
-            Console.WriteLine(this.GetType().Name + " has no Lock Command. Ignore.");
+            //Console.WriteLine(this.GetType().Name + " has no Lock Command. Ignore.");
         }
 
         internal virtual void Unlock()
         {
-            Console.WriteLine(this.GetType().Name + " has no Unlock Command. Ignore.");
+            //Console.WriteLine(this.GetType().Name + " has no Unlock Command. Ignore.");
         }
 
         internal virtual void ShutDown()

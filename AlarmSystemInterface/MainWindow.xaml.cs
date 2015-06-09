@@ -1,4 +1,6 @@
 ﻿using alarm_system;
+using alarm_system_common;
+using alarm_system_model;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -27,7 +29,7 @@ namespace AlarmSystemInterface
             InitializeComponent();
             DataContext = this;
 
-            alarmSystem = new AlarmSystemImpl();
+            alarmSystem = new AlarmSystemModel(2000, 4000, 5000);
             alarmSystem.StateChanged += alarmSystem_StateChanged;
             AlarmSystemState = alarmSystem.CurrentStateType.ToString();
         }

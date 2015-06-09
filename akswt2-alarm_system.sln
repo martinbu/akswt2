@@ -14,6 +14,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "alarm_system", "alarm_syste
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlarmSystemInterface", "AlarmSystemInterface\AlarmSystemInterface.csproj", "{B597D923-67AA-4393-BF6F-ECD0724B6C49}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "alarm_system_model", "alarm_system_model\alarm_system_model.fsproj", "{A02181B0-FF15-4FAF-B641-BF1823890076}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "alarm_system_common", "alarm_system_common\alarm_system_common.csproj", "{51BFD1D2-0D5D-43DB-BE3F-F36262B00278}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +36,14 @@ Global
 		{B597D923-67AA-4393-BF6F-ECD0724B6C49}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B597D923-67AA-4393-BF6F-ECD0724B6C49}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B597D923-67AA-4393-BF6F-ECD0724B6C49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A02181B0-FF15-4FAF-B641-BF1823890076}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A02181B0-FF15-4FAF-B641-BF1823890076}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A02181B0-FF15-4FAF-B641-BF1823890076}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A02181B0-FF15-4FAF-B641-BF1823890076}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51BFD1D2-0D5D-43DB-BE3F-F36262B00278}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51BFD1D2-0D5D-43DB-BE3F-F36262B00278}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51BFD1D2-0D5D-43DB-BE3F-F36262B00278}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51BFD1D2-0D5D-43DB-BE3F-F36262B00278}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

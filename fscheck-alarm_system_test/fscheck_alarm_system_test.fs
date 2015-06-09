@@ -5,83 +5,110 @@
 // https://code.google.com/p/unquote/
 
 open FsCheck
-open alarm_system
 
+open alarm_system_common
+open alarm_system
+open alarm_system_model
+
+open System
+open System.Threading
 //type AlarmSystemState = OpenAndUnlocked | ClosedAndUnlocked | OpenAndLocked
 //                        | ClosedAndLocked | Armed | SilentAndOpen | AlarmFlashAndSound | AlarmFlash
 
-type AlarmSystemModel() =
-    let mutable currentState = AlarmSystemStateType.OpenAndUnlocked
-    member x.Open() = 
-        match currentState with
-        | AlarmSystemStateType.ClosedAndUnlocked -> currentState <- AlarmSystemStateType.OpenAndUnlocked
-        | AlarmSystemStateType.ClosedAndLocked -> currentState <- AlarmSystemStateType.OpenAndLocked
-        | AlarmSystemStateType.Armed -> currentState <- AlarmSystemStateType.AlarmFlashAndSound
-        | _ -> printfn "No action for OPEN"
+let switchToArmedTime = 50
+let switchToFlashTime = 80
+let switchToSilentAndOpenTime = 150
 
-    member x.Close() = 
-        match currentState with
-        | AlarmSystemStateType.OpenAndUnlocked -> currentState <- AlarmSystemStateType.ClosedAndUnlocked
-        | AlarmSystemStateType.OpenAndLocked -> currentState <- AlarmSystemStateType.ClosedAndLocked
-        | AlarmSystemStateType.SilentAndOpen -> currentState <- AlarmSystemStateType.Armed
-        | _ -> printfn "No action for CLOSE"
+let DIFF = 10
 
-    member x.Lock() =
-        match currentState with
-        | AlarmSystemStateType.OpenAndUnlocked -> currentState <- AlarmSystemStateType.OpenAndLocked
-        | AlarmSystemStateType.ClosedAndUnlocked -> currentState <- AlarmSystemStateType.ClosedAndLocked
-        | _ -> printfn "No action for LOCK"
-    
-    member x.Unlock() =
-        match currentState with
-        | AlarmSystemStateType.OpenAndLocked -> currentState <- AlarmSystemStateType.OpenAndUnlocked
-        | AlarmSystemStateType.ClosedAndLocked -> currentState <- AlarmSystemStateType.ClosedAndUnlocked
-        | AlarmSystemStateType.Armed -> currentState <- AlarmSystemStateType.ClosedAndUnlocked
-        | AlarmSystemStateType.AlarmFlashAndSound -> currentState <- AlarmSystemStateType.OpenAndUnlocked
-        | AlarmSystemStateType.AlarmFlash -> currentState <- AlarmSystemStateType.OpenAndUnlocked
-        | AlarmSystemStateType.SilentAndOpen -> currentState <- AlarmSystemStateType.OpenAndUnlocked
-        | _ -> printfn "No action for UNLOCK"
-
-    member x.GetCurrentState() = currentState
-
-    override x.ToString() = currentState.ToString()
+let mutable wait = false
 
 open FsCheck.Commands
 open System.Collections.Generic
 
+let list = new List<StateChangedEventArgs>()
+
+let eventHandler (args : StateChangedEventArgs) = 
+    if wait then
+        list.Add(args)
+
+let doWait (model : AlarmSystem) (impl : AlarmSystem) timeToWait = 
+    wait <- true
+    System.Threading.Thread.Sleep(timeToWait + DIFF)
+    if list.Count > 1 then 
+        printfn "To much states %s | %s"  (model.CurrentStateType.ToString()) (impl.CurrentStateType.ToString())
+        for element in list do
+            printfn "    o: %s | n: %s" (element.OldStateType.ToString()) (element.NewStateType.ToString())
+    else
+        printfn "Current State in wait: %s | %s" (model.CurrentStateType.ToString()) (impl.CurrentStateType.ToString())
+    wait <- false
+    list.Clear()
+
+let waitFor (model : AlarmSystem) (impl : AlarmSystem) = 
+    match model.CurrentStateType with
+    | AlarmSystemStateType.ClosedAndLocked -> doWait model impl switchToArmedTime
+    | AlarmSystemStateType.AlarmFlashAndSound -> doWait model impl switchToFlashTime
+    | AlarmSystemStateType.AlarmFlash -> doWait model impl switchToSilentAndOpenTime
+    | _ -> ()
+
+
 let spec =
     let specOpen =
-        { new ICommand<AlarmSystem, AlarmSystemModel>() with
+        { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Open(); c
             member x.RunModel m = m.Open(); m
-            member x.Post (c,m) = m.GetCurrentState() = c.CurrentStateType |> Prop.ofTestable
+            
+            member x.Post (c,m) = 
+                let r1 = m.CurrentStateType = c.CurrentStateType
+                waitFor m c
+                (m.CurrentStateType = c.CurrentStateType && r1) |> Prop.ofTestable
+
             override x.ToString() = "open"}
 
     let specClose = 
-        { new ICommand<AlarmSystem, AlarmSystemModel>() with
+        { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Close(); c
             member x.RunModel m = m.Close(); m
-            member x.Post (c,m) = m.GetCurrentState() = c.CurrentStateType |> Prop.ofTestable
+            
+            member x.Post (c,m) = 
+                let r1 = m.CurrentStateType = c.CurrentStateType
+                waitFor m c
+                (m.CurrentStateType = c.CurrentStateType && r1) |> Prop.ofTestable
+            
             override x.ToString() = "close"}
 
     let specLock = 
-        { new ICommand<AlarmSystem, AlarmSystemModel>() with
+        { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Lock(); c
             member x.RunModel m = m.Lock(); m
-            member x.Post (c,m) = m.GetCurrentState() = c.CurrentStateType |> Prop.ofTestable
+
+            member x.Post (c,m) = 
+                let r1 = m.CurrentStateType = c.CurrentStateType
+                waitFor m c
+                (m.CurrentStateType = c.CurrentStateType && r1) |> Prop.ofTestable
+            
             override x.ToString() = "lock"}
 
     let specUnlock = 
-        { new ICommand<AlarmSystem, AlarmSystemModel>() with
+        { new ICommand<AlarmSystem, AlarmSystem>() with
+            member x.Pre c = true
             member x.RunActual c = c.Unlock(); c
             member x.RunModel m = m.Unlock(); m
-            member x.Post (c,m) = m.GetCurrentState() = c.CurrentStateType |> Prop.ofTestable
+            
+            member x.Post (c,m) = 
+                let r1 = m.CurrentStateType = c.CurrentStateType
+                waitFor m c
+                (m.CurrentStateType = c.CurrentStateType && r1) |> Prop.ofTestable
+
             override x.ToString() = "unlock"}
 
-    { new ISpecification<AlarmSystem,AlarmSystemModel> with
-      member x.Initial() = (new AlarmSystemImpl() :> AlarmSystem, new AlarmSystemModel())
+    { new ISpecification<AlarmSystem,AlarmSystem> with
+      member x.Initial() = 
+        let alarmSystem = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime) :> AlarmSystem
+        alarmSystem.StateChanged.Add(eventHandler)
+        (alarmSystem, new AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime) :> AlarmSystem)
+
       member x.GenCommand _ = Gen.elements [specOpen;specClose;specLock;specUnlock] }
 
 //Check.Verbose(asProperty spec)
 Check.Quick(asProperty spec)
-AlarmSystemImpl.ShutDownAll();

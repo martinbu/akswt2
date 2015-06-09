@@ -1,4 +1,5 @@
-﻿using System;
+﻿using alarm_system_common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,9 +10,12 @@ namespace alarm_system.states
 {
     internal class AlarmFlashAndSoundState : AlarmSystemState
     {
-        internal AlarmFlashAndSoundState(Context context)
+        private readonly int switchToFlashTime;
+
+        internal AlarmFlashAndSoundState(Context context, int switchToFlashTime)
             : base(context, AlarmSystemStateType.AlarmFlashAndSound)
         {
+            this.switchToFlashTime = switchToFlashTime;
             CancelAlarm();
         }
 
@@ -32,7 +36,7 @@ namespace alarm_system.states
         private async void turnOffSound()
         {
             try {
-                await Task.Delay(TimeSpan.FromSeconds(30), cancelAlarm.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(switchToFlashTime), cancelAlarm.Token);
                 ChangeStateTo(AlarmSystemStateType.AlarmFlash);
             }
             catch (TaskCanceledException) { }

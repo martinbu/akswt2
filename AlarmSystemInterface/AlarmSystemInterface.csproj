@@ -94,6 +94,14 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\alarm_system_model\alarm_system_model.fsproj">
+      <Project>{a02181b0-ff15-4faf-b641-bf1823890076}</Project>
+      <Name>alarm_system_model</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\alarm_system_common\alarm_system_common.csproj">
+      <Project>{51bfd1d2-0d5d-43db-be3f-f36262b00278}</Project>
+      <Name>alarm_system_common</Name>
+    </ProjectReference>
     <ProjectReference Include="..\alarm_system\alarm_system.csproj">
       <Project>{16646c44-3ec7-429a-a74e-9d217f4ae084}</Project>
       <Name>alarm_system</Name>

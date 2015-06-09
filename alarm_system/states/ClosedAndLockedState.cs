@@ -1,4 +1,5 @@
-﻿using System;
+﻿using alarm_system_common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,9 +10,12 @@ namespace alarm_system.states
 {
     internal class ClosedAndLockedState : AlarmSystemState
     {
-        internal ClosedAndLockedState(Context context)
+        private readonly int switchToArmedTime;
+
+        internal ClosedAndLockedState(Context context, int switchToArmedTime)
             : base(context, AlarmSystemStateType.ClosedAndLocked)
         {
+            this.switchToArmedTime = switchToArmedTime;
             CancelArmedActivation();
         }
 
@@ -39,7 +43,7 @@ namespace alarm_system.states
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(20), cancelArmedActivation.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(switchToArmedTime), cancelArmedActivation.Token);
                 ChangeStateTo(AlarmSystemStateType.Armed);
             }
             catch (TaskCanceledException) { }
