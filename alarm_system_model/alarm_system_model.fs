@@ -44,14 +44,10 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
 
         this.FireEvent(oldState, newState)
 
-    member this.setStateWithoutCancel newState =
-        let oldState = currentState
-        currentState <- newState
-
-        this.FireEvent(oldState, newState)
-
     member this.FireEvent(oldState, newState) =
         stateChanged.Trigger([|this; new StateChangedEventArgs(oldState, newState)|])
+
+    member this.MyReadWriteProperty with get () = 5
 
     interface AlarmSystem with
 
@@ -91,4 +87,4 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
         [<CLIEvent>]
         member this.StateChanged = stateChanged.Publish
 
-        member val CurrentStateType = currentState with get
+        member this.CurrentStateType with get () = currentState

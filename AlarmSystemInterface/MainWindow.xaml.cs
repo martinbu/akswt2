@@ -29,7 +29,7 @@ namespace AlarmSystemInterface
             InitializeComponent();
             DataContext = this;
 
-            alarmSystem = new AlarmSystemModel(2000, 4000, 5000);
+            alarmSystem = new AlarmSystemImpl(2000, 4000, 5000);
             alarmSystem.StateChanged += alarmSystem_StateChanged;
             AlarmSystemState = alarmSystem.CurrentStateType.ToString();
         }

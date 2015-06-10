@@ -15,11 +15,11 @@ open System.Threading
 //type AlarmSystemState = OpenAndUnlocked | ClosedAndUnlocked | OpenAndLocked
 //                        | ClosedAndLocked | Armed | SilentAndOpen | AlarmFlashAndSound | AlarmFlash
 
-let switchToArmedTime = 50
-let switchToFlashTime = 80
-let switchToSilentAndOpenTime = 150
+let switchToArmedTime = 20
+let switchToFlashTime = 40
+let switchToSilentAndOpenTime = 60
 
-let DIFF = 10
+let DIFF = 5
 
 let mutable wait = false
 
@@ -44,12 +44,18 @@ let doWait (model : AlarmSystem) (impl : AlarmSystem) timeToWait =
     wait <- false
     list.Clear()
 
+let rnd = System.Random(DateTime.Now.Millisecond)
+
 let waitFor (model : AlarmSystem) (impl : AlarmSystem) = 
-    match model.CurrentStateType with
-    | AlarmSystemStateType.ClosedAndLocked -> doWait model impl switchToArmedTime
-    | AlarmSystemStateType.AlarmFlashAndSound -> doWait model impl switchToFlashTime
-    | AlarmSystemStateType.AlarmFlash -> doWait model impl switchToSilentAndOpenTime
-    | _ -> ()
+  
+    let randomTrueFalse = (rnd.Next(0, 2) = 0)
+
+    if randomTrueFalse then    
+        match model.CurrentStateType with
+        | AlarmSystemStateType.ClosedAndLocked -> doWait model impl switchToArmedTime
+        | AlarmSystemStateType.AlarmFlashAndSound -> doWait model impl switchToFlashTime
+        | AlarmSystemStateType.AlarmFlash -> doWait model impl switchToSilentAndOpenTime
+        | _ -> ()
 
 
 let spec =
@@ -111,4 +117,5 @@ let spec =
       member x.GenCommand _ = Gen.elements [specOpen;specClose;specLock;specUnlock] }
 
 //Check.Verbose(asProperty spec)
+AlarmSystemImpl.ShutDownAll()
 Check.Quick(asProperty spec)
