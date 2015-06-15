@@ -7,7 +7,7 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
     let switchToArmedTime = switchToArmedTime
     let switchToFlashTime = switchToFlashTime
     let switchToSilentAndOpenTime = switchToSilentAndOpenTime
-    let mutable currentState = AlarmSystemStateType.OpenAndUnlocked
+    let mutable currentState = AlarmSystemState.OpenAndUnlocked
 
     let stateChanged = new DelegateEvent<System.EventHandler<StateChangedEventArgs>>()
 
@@ -19,15 +19,15 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
 
     member this.asyncSwitchTimedToArmed fromState =
         Async.CancelDefaultToken()
-        ignore (Async.Start ((this.asyncSwitchToState fromState switchToArmedTime AlarmSystemStateType.Armed), Async.DefaultCancellationToken))
+        ignore (Async.Start ((this.asyncSwitchToState fromState switchToArmedTime AlarmSystemState.Armed), Async.DefaultCancellationToken))
 
     member this.asyncSwitchTimedToFlash fromState =
         Async.CancelDefaultToken()
-        ignore (Async.Start ((this.asyncSwitchToState fromState switchToFlashTime AlarmSystemStateType.AlarmFlash), Async.DefaultCancellationToken))
+        ignore (Async.Start ((this.asyncSwitchToState fromState switchToFlashTime AlarmSystemState.AlarmFlash), Async.DefaultCancellationToken))
 
     member this.asyncSwitchTimedToSilentAndOpen fromState =
         Async.CancelDefaultToken()
-        ignore (Async.Start ((this.asyncSwitchToState fromState switchToSilentAndOpenTime AlarmSystemStateType.SilentAndOpen), Async.DefaultCancellationToken))
+        ignore (Async.Start ((this.asyncSwitchToState fromState switchToSilentAndOpenTime AlarmSystemState.SilentAndOpen), Async.DefaultCancellationToken))
 
     override this.ToString() = currentState.ToString()
 
@@ -37,9 +37,9 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
         currentState <- newState
 
         match currentState with
-        | AlarmSystemStateType.ClosedAndLocked -> this.asyncSwitchTimedToArmed currentState
-        | AlarmSystemStateType.AlarmFlashAndSound -> this.asyncSwitchTimedToFlash currentState
-        | AlarmSystemStateType.AlarmFlash -> this.asyncSwitchTimedToSilentAndOpen currentState
+        | AlarmSystemState.ClosedAndLocked -> this.asyncSwitchTimedToArmed currentState
+        | AlarmSystemState.AlarmFlashAndSound -> this.asyncSwitchTimedToFlash currentState
+        | AlarmSystemState.AlarmFlash -> this.asyncSwitchTimedToSilentAndOpen currentState
         | _ -> ()
 
         this.FireStateChangedEvent(oldState, newState)
@@ -51,32 +51,32 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
 
         member this.Open() = 
             match currentState with
-            | AlarmSystemStateType.ClosedAndUnlocked -> this.setState AlarmSystemStateType.OpenAndUnlocked
-            | AlarmSystemStateType.ClosedAndLocked -> this.setState AlarmSystemStateType.OpenAndLocked
-            | AlarmSystemStateType.Armed -> this.setState AlarmSystemStateType.AlarmFlashAndSound
+            | AlarmSystemState.ClosedAndUnlocked -> this.setState AlarmSystemState.OpenAndUnlocked
+            | AlarmSystemState.ClosedAndLocked -> this.setState AlarmSystemState.OpenAndLocked
+            | AlarmSystemState.Armed -> this.setState AlarmSystemState.AlarmFlashAndSound
             | _ -> ()
 
         member this.Close() = 
             match currentState with
-            | AlarmSystemStateType.OpenAndUnlocked -> this.setState AlarmSystemStateType.ClosedAndUnlocked
-            | AlarmSystemStateType.OpenAndLocked -> this.setState AlarmSystemStateType.ClosedAndLocked
-            | AlarmSystemStateType.SilentAndOpen -> this.setState AlarmSystemStateType.Armed
+            | AlarmSystemState.OpenAndUnlocked -> this.setState AlarmSystemState.ClosedAndUnlocked
+            | AlarmSystemState.OpenAndLocked -> this.setState AlarmSystemState.ClosedAndLocked
+            | AlarmSystemState.SilentAndOpen -> this.setState AlarmSystemState.Armed
             | _ -> ()
 
         member this.Lock() =
             match currentState with
-            | AlarmSystemStateType.OpenAndUnlocked -> this.setState AlarmSystemStateType.OpenAndLocked
-            | AlarmSystemStateType.ClosedAndUnlocked -> this.setState AlarmSystemStateType.ClosedAndLocked
+            | AlarmSystemState.OpenAndUnlocked -> this.setState AlarmSystemState.OpenAndLocked
+            | AlarmSystemState.ClosedAndUnlocked -> this.setState AlarmSystemState.ClosedAndLocked
             | _ -> ()
     
-        member this.Unlock() =
+        member this.Unlock(pinCode) =
             match currentState with
-            | AlarmSystemStateType.OpenAndLocked -> this.setState AlarmSystemStateType.OpenAndUnlocked
-            | AlarmSystemStateType.ClosedAndLocked -> this.setState AlarmSystemStateType.ClosedAndUnlocked
-            | AlarmSystemStateType.Armed -> this.setState AlarmSystemStateType.ClosedAndUnlocked
-            | AlarmSystemStateType.AlarmFlashAndSound -> this.setState AlarmSystemStateType.OpenAndUnlocked
-            | AlarmSystemStateType.AlarmFlash -> this.setState AlarmSystemStateType.OpenAndUnlocked
-            | AlarmSystemStateType.SilentAndOpen -> this.setState AlarmSystemStateType.OpenAndUnlocked
+            | AlarmSystemState.OpenAndLocked -> this.setState AlarmSystemState.OpenAndUnlocked
+            | AlarmSystemState.ClosedAndLocked -> this.setState AlarmSystemState.ClosedAndUnlocked
+            | AlarmSystemState.Armed -> this.setState AlarmSystemState.ClosedAndUnlocked
+            | AlarmSystemState.AlarmFlashAndSound -> this.setState AlarmSystemState.OpenAndUnlocked
+            | AlarmSystemState.AlarmFlash -> this.setState AlarmSystemState.OpenAndUnlocked
+            | AlarmSystemState.SilentAndOpen -> this.setState AlarmSystemState.OpenAndUnlocked
             | _ -> ()
 
         member this.ShutDown() = 
@@ -85,4 +85,4 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
         [<CLIEvent>]
         member this.StateChanged = stateChanged.Publish
 
-        member this.CurrentStateType with get () = currentState
+        member this.CurrentState with get () = currentState

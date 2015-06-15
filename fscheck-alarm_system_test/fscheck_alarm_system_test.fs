@@ -74,7 +74,7 @@ let compareTime (time1 : TimeSpan) (time2 : TimeSpan)=
 
 let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) timeToWait = 
     addWaiting true
-    let fromState = model.CurrentStateType
+    let fromState = model.CurrentState
 
     System.Threading.Thread.Sleep(timeToWait + DELTA_WAIT)
 
@@ -100,10 +100,10 @@ let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) =
     let randomBool = (rnd.Next(0, 2) = 0)
 
     let timeToWait =
-        match model.CurrentStateType with
-        | AlarmSystemStateType.ClosedAndLocked -> Some switchToArmedTime
-        | AlarmSystemStateType.AlarmFlashAndSound -> Some switchToFlashTime
-        | AlarmSystemStateType.AlarmFlash -> Some switchToSilentAndOpenTime
+        match model.CurrentState with
+        | AlarmSystemState.ClosedAndLocked -> Some switchToArmedTime
+        | AlarmSystemState.AlarmFlashAndSound -> Some switchToFlashTime
+        | AlarmSystemState.AlarmFlash -> Some switchToSilentAndOpenTime
         | _ -> None
 
     if randomBool && timeToWait.IsSome then
@@ -114,7 +114,13 @@ let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) =
 
 // ----------------------------------------------------------------------------------
 
+let getNumber() = Gen.sized <| fun s -> Gen.choose (0,9999)
 
+let x = Gen.frequency [ (2, gen { return 5 }); (1, ((Gen.sized <| fun s -> Gen.choose (0,s)) gen)]
+
+let y = Gen.oneof [ gen { return 5 }; gen { let! r = (Gen.sized <| fun () -> Gen.choose (0,99) r) } ]
+
+// ----------------------------------------------------------------------------------
 let spec =
     let specOpen =
         { new ICommand<AlarmSystem, AlarmSystem>() with
@@ -123,7 +129,7 @@ let spec =
             
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentStateType = c.CurrentStateType) |> Prop.ofTestable
+                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
 
             override x.ToString() = if getNextWaiting() then "open w" else "open"}
 
@@ -134,7 +140,7 @@ let spec =
             
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentStateType = c.CurrentStateType) |> Prop.ofTestable
+                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
             
             override x.ToString() = if getNextWaiting() then "close w" else "close"}
 
@@ -145,26 +151,26 @@ let spec =
 
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentStateType = c.CurrentStateType) |> Prop.ofTestable
+                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
             
             override x.ToString() = if getNextWaiting() then "lock w" else "lock"}
 
     let specUnlock = 
         { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.Pre c = true
-            member x.RunActual c = c.Unlock(); c
-            member x.RunModel m = m.Unlock(); m
+            member x.RunActual c = c.Unlock("1234"); c
+            member x.RunModel m = m.Unlock("1234"); m
             
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentStateType = c.CurrentStateType) |> Prop.ofTestable
+                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
 
             override x.ToString() = if getNextWaiting() then "unlock w" else "unlock"}
 
     { new ISpecification<AlarmSystem,AlarmSystem> with
       member x.Initial() = 
 
-        let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, 50) :> AlarmSystem
+        let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime) :> AlarmSystem
         alarmSystemImpl.StateChanged.Add(implementationEventHandler)
 
         let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime) :> AlarmSystem

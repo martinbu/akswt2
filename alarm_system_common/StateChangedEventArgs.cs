@@ -8,10 +8,10 @@ namespace alarm_system_common
 {
     public class StateChangedEventArgs : EventArgs
     {
-        public AlarmSystemStateType OldStateType { get; private set; }
-        public AlarmSystemStateType NewStateType { get; private set; }
+        public AlarmSystemState OldStateType { get; private set; }
+        public AlarmSystemState NewStateType { get; private set; }
 
-        public StateChangedEventArgs(AlarmSystemStateType oldStateType, AlarmSystemStateType newStateType)
+        public StateChangedEventArgs(AlarmSystemState oldStateType, AlarmSystemState newStateType)
         {
             this.OldStateType = oldStateType;
             this.NewStateType = newStateType;

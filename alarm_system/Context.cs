@@ -10,6 +10,8 @@ namespace alarm_system
 {
     internal interface Context
     {
-        void ChangeState(AlarmSystemStateType oldStateType, AlarmSystemStateType newStateType);
+        void ChangeState(AlarmSystemState oldStateType, AlarmSystemState newStateType);
+
+        PinCheckResult checkPinCode(string pinCode);
     }
 }

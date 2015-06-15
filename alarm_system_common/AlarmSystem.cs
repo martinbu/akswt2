@@ -8,7 +8,7 @@ namespace alarm_system_common
 {
     public interface AlarmSystem
     {
-        AlarmSystemStateType CurrentStateType { get; }
+        AlarmSystemState CurrentState { get; }
 
         event EventHandler<StateChangedEventArgs> StateChanged;
 
@@ -18,7 +18,7 @@ namespace alarm_system_common
 
         void Lock();
 
-        void Unlock();
+        void Unlock(string pinCode);
 
         void ShutDown();
     }

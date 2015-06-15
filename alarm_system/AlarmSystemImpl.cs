@@ -11,13 +11,15 @@ namespace alarm_system
     public class AlarmSystemImpl : AlarmSystem, Context
     {
 
-        private Dictionary<AlarmSystemStateType, AlarmSystemState> AlarmSystemStates { get; set; }
+        private Dictionary<AlarmSystemState, AlarmSystemStateBase> AlarmSystemStates { get; set; }
 
         private static List<AlarmSystem> initializedAlarmSystem = new List<AlarmSystem>();
 
         private readonly int switchToArmedTime = 2000;
         private readonly int switchToFlashTime = 4000;
         private readonly int switchToSilentAndOpenTime = 5000;
+
+        private string alarmSystemPinCode = "1234";
 
         public AlarmSystemImpl()
         {
@@ -37,7 +39,7 @@ namespace alarm_system
 
             ShutDownAll();
             
-            AlarmSystemStates = new Dictionary<AlarmSystemStateType, AlarmSystemState>();
+            AlarmSystemStates = new Dictionary<AlarmSystemState, AlarmSystemStateBase>();
             AddState(new OpenAndUnlockedState(this));
             AddState(new OpenAndLockedState(this));
             AddState(new ClosedAndUnlockedState(this));
@@ -47,40 +49,40 @@ namespace alarm_system
             AddState(new AlarmFlashAndSoundState(this, switchToFlashTime));
             AddState(new AlarmFlashState(this, switchToSilentAndOpenTime));
 
-            CurrentStateType = AlarmSystemStateType.OpenAndUnlocked;
+            CurrentState = AlarmSystemState.OpenAndUnlocked;
 
             initializedAlarmSystem.Add(this);
         }
 
-        public AlarmSystemStateType CurrentStateType { get; private set; }
+        public AlarmSystemState CurrentState { get; private set; }
 
         public void Open()
         {
-            AlarmSystemStates[CurrentStateType].Open();
+            AlarmSystemStates[CurrentState].Open();
         }
 
         public void Close()
         {
-            AlarmSystemStates[CurrentStateType].Close();
+            AlarmSystemStates[CurrentState].Close();
         }
 
         public void Lock()
         {
-            AlarmSystemStates[CurrentStateType].Lock();
+            AlarmSystemStates[CurrentState].Lock();
         }
 
-        public void Unlock()
+        public void Unlock(string pinCode)
         {
-            AlarmSystemStates[CurrentStateType].Unlock();
+            AlarmSystemStates[CurrentState].Unlock(pinCode);
         }
 
-        public void ChangeState(AlarmSystemStateType oldStateType, AlarmSystemStateType newStateType)
+        public void ChangeState(AlarmSystemState oldStateType, AlarmSystemState newStateType)
         {
             if (oldStateType == newStateType)
                 return;
 
-            CurrentStateType = newStateType;
-            AlarmSystemStates[CurrentStateType].GotActive();
+            CurrentState = newStateType;
+            AlarmSystemStates[CurrentState].GotActive();
 
             if (StateChanged != null)
             {
@@ -88,9 +90,16 @@ namespace alarm_system
             }
         }
 
+        PinCheckResult Context.checkPinCode(string pinCode)
+        {
+            if (pinCode == this.alarmSystemPinCode)
+                return PinCheckResult.CORRECT;
+
+            return PinCheckResult.INCORRECT;
+        }
 
 
-        private void AddState(AlarmSystemState alarmSystemState)
+        private void AddState(AlarmSystemStateBase alarmSystemState)
         {
             AlarmSystemStates.Add(alarmSystemState.StateType, alarmSystemState);
         }

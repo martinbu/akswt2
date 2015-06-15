@@ -8,21 +8,37 @@ using System.Threading.Tasks;
 
 namespace alarm_system.states
 {
-    internal class ArmedState : AlarmSystemState
+    internal class ArmedState : AlarmSystemStateBase
     {
         internal ArmedState(Context context)
-            : base(context, AlarmSystemStateType.Armed)
+            : base(context, AlarmSystemState.Armed)
         {
         }
 
-        internal override void Unlock()
+        private int wrongPinCodeCounter = 0;
+
+        internal override void GotActive()
         {
-            ChangeStateTo(AlarmSystemStateType.ClosedAndUnlocked);
+            wrongPinCodeCounter = 0;
+        }
+
+        internal override void Unlock(string pinCode)
+        {
+            wrongPinCodeCounter++;
+
+            if (Context.checkPinCode(pinCode) == PinCheckResult.CORRECT)
+            {
+                ChangeStateTo(AlarmSystemState.ClosedAndUnlocked);
+            }
+            else if (wrongPinCodeCounter >= 3)
+            {
+                ChangeStateTo(AlarmSystemState.AlarmFlashAndSound);
+            }
         }
 
         internal override void Open()
         {
-            ChangeStateTo(AlarmSystemStateType.AlarmFlashAndSound);
+            ChangeStateTo(AlarmSystemState.AlarmFlashAndSound);
         }
     }
 }

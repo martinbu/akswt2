@@ -24,6 +24,8 @@ namespace AlarmSystemInterface
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        private AlarmSystem alarmSystem;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -31,15 +33,14 @@ namespace AlarmSystemInterface
 
             alarmSystem = new AlarmSystemImpl(2000, 4000, 5000);
             alarmSystem.StateChanged += alarmSystem_StateChanged;
-            AlarmSystemState = alarmSystem.CurrentStateType.ToString();
+            AlarmSystemState = alarmSystem.CurrentState.ToString();
+            AlarmSystemPin = "####";
         }
 
         void alarmSystem_StateChanged(object sender, StateChangedEventArgs e)
         {
             AlarmSystemState = e.NewStateType.ToString();
         }
-
-        private AlarmSystem alarmSystem;
 
         private void Open(object sender, RoutedEventArgs e)
         {
@@ -58,7 +59,7 @@ namespace AlarmSystemInterface
 
         private void Unlock(object sender, RoutedEventArgs e)
         {
-            alarmSystem.Unlock();
+            alarmSystem.Unlock(AlarmSystemPin);
         }
 
         private String _AlarmSystemState;
@@ -73,6 +74,17 @@ namespace AlarmSystemInterface
             }
         }
 
+        private string _AlarmSystemPin;
+
+        public string AlarmSystemPin
+        {
+            get { return _AlarmSystemPin; }
+            set
+            { 
+                _AlarmSystemPin = value;
+                NotifyChange("_AlarmSystemPin");
+            }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 

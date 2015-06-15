@@ -8,21 +8,21 @@ using System.Threading.Tasks;
 
 namespace alarm_system.states
 {
-    internal class SilentAndOpenState : AlarmSystemState
+    internal class SilentAndOpenState : AlarmSystemStateBase
     {
         internal SilentAndOpenState(Context context)
-            : base(context, AlarmSystemStateType.SilentAndOpen)
+            : base(context, AlarmSystemState.SilentAndOpen)
         {
         }
 
         internal override void Close()
         {
-            base.ChangeStateTo(AlarmSystemStateType.Armed);
+            base.ChangeStateTo(AlarmSystemState.Armed);
         }
 
-        internal override void Unlock()
+        internal override void Unlock(string pinCode)
         {
-            base.ChangeStateTo(AlarmSystemStateType.OpenAndUnlocked);
+            base.ChangeStateToWithPin(AlarmSystemState.OpenAndUnlocked, pinCode);
         }
     }
 }

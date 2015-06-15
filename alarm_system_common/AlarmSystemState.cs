@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace alarm_system_common
 {
-    public enum AlarmSystemStateType
+    public enum AlarmSystemState
     {
         OpenAndUnlocked,
         ClosedAndUnlocked,

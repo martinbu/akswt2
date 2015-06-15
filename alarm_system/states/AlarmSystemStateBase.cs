@@ -7,21 +7,29 @@ using System.Threading.Tasks;
 
 namespace alarm_system.states
 {
-    internal abstract class AlarmSystemState
+    internal abstract class AlarmSystemStateBase
     {
 
         protected Context Context { get; private set; }
 
-        public AlarmSystemStateType StateType { get; private set; }
+        public AlarmSystemState StateType { get; private set; }
 
-        protected AlarmSystemState(Context context, AlarmSystemStateType stateType)
+        protected AlarmSystemStateBase(Context context, AlarmSystemState stateType)
         {
             this.Context = context;
             this.StateType = stateType;
         }
 
-        protected void ChangeStateTo(AlarmSystemStateType newStateType) {
+        protected void ChangeStateTo(AlarmSystemState newStateType) {
             Context.ChangeState(this.StateType, newStateType);
+        }
+
+        protected void ChangeStateToWithPin(AlarmSystemState newStateType, string pinCode)
+        {
+            if (Context.checkPinCode(pinCode) == PinCheckResult.CORRECT)
+            {
+                Context.ChangeState(this.StateType, newStateType);
+            }
         }
 
         internal virtual void GotActive()
@@ -44,7 +52,7 @@ namespace alarm_system.states
             //Console.WriteLine(this.GetType().Name + " has no Lock Command. Ignore.");
         }
 
-        internal virtual void Unlock()
+        internal virtual void Unlock(string pin)
         {
             //Console.WriteLine(this.GetType().Name + " has no Unlock Command. Ignore.");
         }

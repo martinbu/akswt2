@@ -8,12 +8,12 @@ using System.Threading.Tasks;
 
 namespace alarm_system.states
 {
-    internal class AlarmFlashState : AlarmSystemState
+    internal class AlarmFlashState : AlarmSystemStateBase
     {
         private readonly int switchToSilentAndOpenTime;
 
         internal AlarmFlashState(Context context, int switchToSilentAndOpenTime)
-            : base(context, AlarmSystemStateType.AlarmFlash)
+            : base(context, AlarmSystemState.AlarmFlash)
         {
             this.switchToSilentAndOpenTime = switchToSilentAndOpenTime;
             CancelAlarm();
@@ -21,10 +21,13 @@ namespace alarm_system.states
 
         private CancellationTokenSource cancelAlarm = null;
 
-        internal override void Unlock()
+        internal override void Unlock(string pinCode)
         {
-            CancelAlarm();
-            base.ChangeStateTo(AlarmSystemStateType.OpenAndUnlocked);
+            if (Context.checkPinCode(pinCode) == PinCheckResult.CORRECT)
+            {
+                CancelAlarm();
+                base.ChangeStateTo(AlarmSystemState.OpenAndUnlocked);
+            }
         }
 
         internal override void GotActive()
@@ -37,7 +40,7 @@ namespace alarm_system.states
         {
             try {
                 await Task.Delay(TimeSpan.FromMilliseconds(switchToSilentAndOpenTime), cancelAlarm.Token);
-                ChangeStateTo(AlarmSystemStateType.SilentAndOpen);
+                ChangeStateTo(AlarmSystemState.SilentAndOpen);
             }
             catch (TaskCanceledException) { }
             catch (ObjectDisposedException) { }
