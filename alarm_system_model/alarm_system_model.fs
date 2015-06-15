@@ -42,12 +42,10 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
         | AlarmSystemStateType.AlarmFlash -> this.asyncSwitchTimedToSilentAndOpen currentState
         | _ -> ()
 
-        this.FireEvent(oldState, newState)
+        this.FireStateChangedEvent(oldState, newState)
 
-    member this.FireEvent(oldState, newState) =
+    member this.FireStateChangedEvent(oldState, newState) =
         stateChanged.Trigger([|this; new StateChangedEventArgs(oldState, newState)|])
-
-    member this.MyReadWriteProperty with get () = 5
 
     interface AlarmSystem with
 
