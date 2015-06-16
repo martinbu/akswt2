@@ -31,7 +31,7 @@ namespace AlarmSystemInterface
             InitializeComponent();
             DataContext = this;
 
-            alarmSystem = new AlarmSystemImpl(2000, 4000, 5000);
+            alarmSystem = new AlarmSystemImpl(2000, 4000, 5000, 3);
             alarmSystem.StateChanged += alarmSystem_StateChanged;
             AlarmSystemState = alarmSystem.CurrentState.ToString();
             AlarmSystemPin = "####";

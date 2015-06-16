@@ -21,20 +21,20 @@ open System.Collections.Generic
 let switchToArmedTime = 20
 let switchToFlashTime = 40
 let switchToSilentAndOpenTime = 80
+let allowedWrongPinCodeCount = 3;
 
 let DELTA_COMPARE = 5
 let DELTA_WAIT = 15
-
-let waitingQueue = new Queue<bool>()
-
-let addWaiting(v) = waitingQueue.Enqueue(v)
-let getNextWaiting() = waitingQueue.Dequeue()
 
 [<Struct>]
 type StateChangedEvent =
     val State: StateChangedEventArgs
     val Time: DateTime
     new(state, time) = {State = state; Time = time}
+
+type WaitResult =
+    { isOK : bool; 
+      Waited : bool }
 
 // ----------------------------------------------------------------------------------
 
@@ -67,13 +67,12 @@ let compareTime (time1 : TimeSpan) (time2 : TimeSpan)=
     if -DELTA_COMPARE <= diff.Milliseconds && diff.Milliseconds <= DELTA_COMPARE then 
         true
     else 
-        printfn "diff is too big: %d" diff.Milliseconds
+        printfn "The time needed for the state switch was too big: %d" diff.Milliseconds
         false
 
 // ----------------------------------------------------------------------------------
 
 let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) timeToWait = 
-    addWaiting true
     let fromState = model.CurrentState
 
     System.Threading.Thread.Sleep(timeToWait + DELTA_WAIT)
@@ -89,98 +88,121 @@ let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) timeToWait
     if beforeModelEvent.State.NewStateType = beforeImplEvent.State.NewStateType
         && currentModelEvent.State.NewStateType = currentImplEvent.State.NewStateType
         && isTimeDiffOk then
-        true
+        {WaitResult.isOK = true; WaitResult.Waited = true}
     else
-        false
+        {WaitResult.isOK = false; WaitResult.Waited = true}
 
 let rnd = System.Random(DateTime.Now.Millisecond)
 
-let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) = 
-  
-    let randomBool = (rnd.Next(0, 2) = 0)
+let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) wait = 
 
-    let timeToWait =
-        match model.CurrentState with
-        | AlarmSystemState.ClosedAndLocked -> Some switchToArmedTime
-        | AlarmSystemState.AlarmFlashAndSound -> Some switchToFlashTime
-        | AlarmSystemState.AlarmFlash -> Some switchToSilentAndOpenTime
-        | _ -> None
+    if not wait then
+        {WaitResult.isOK = true; WaitResult.Waited = false}
 
-    if randomBool && timeToWait.IsSome then
-        waitAndCheckTimedEvent model impl timeToWait.Value
     else
-        addWaiting false
-        true
+        let timeToWait =
+            match model.CurrentState with
+            | AlarmSystemState.ClosedAndLocked -> Some switchToArmedTime
+            | AlarmSystemState.AlarmFlashAndSound -> Some switchToFlashTime
+            | AlarmSystemState.AlarmFlash -> Some switchToSilentAndOpenTime
+            | _ -> None
+
+        if timeToWait.IsSome then
+            waitAndCheckTimedEvent model impl timeToWait.Value
+        else
+            {WaitResult.isOK = true; WaitResult.Waited = false}
 
 // ----------------------------------------------------------------------------------
 
-let getNumber() = Gen.sized <| fun s -> Gen.choose (0,9999)
+let pinGenerator = Gen.frequency [ (1, (Gen.sized <| fun s -> Gen.choose (0,9999)) ); (1, gen { return 1234 })]
+let getRandomPin () = (Gen.sample 1 1 (pinGenerator)).Head
 
-let x = Gen.frequency [ (2, gen { return 5 }); (1, ((Gen.sized <| fun s -> Gen.choose (0,s)) gen)]
+let waitGenerator = Gen.oneof [ gen { return true }; gen { return false }]
+let getRandomShouldWait () = (waitGenerator |> Gen.sample 1 1).Head
 
-let y = Gen.oneof [ gen { return 5 }; gen { let! r = (Gen.sized <| fun () -> Gen.choose (0,99) r) } ]
+let getRandomShouldWait1 () = (waitGenerator |> Gen.sample 1 1).Head
 
+let toString text wait = 
+    if wait then
+        text + "-w"
+    else
+        text
+        
 // ----------------------------------------------------------------------------------
 let spec =
-    let specOpen =
+
+    let specOpen wait =
+        let waited = ref false;
         { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Open(); c
             member x.RunModel m = m.Open(); m
-            
             member x.Post (c,m) = 
-                let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+                let timedCheck = checkForTimedStateChange m c wait
+                waited := timedCheck.Waited
+                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
 
-            override x.ToString() = if getNextWaiting() then "open w" else "open"}
+            override x.ToString() = toString "open" !waited}
 
-    let specClose = 
+    let specClose wait = 
+        let waited = ref false;
         { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Close(); c
             member x.RunModel m = m.Close(); m
-            
             member x.Post (c,m) = 
-                let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+                let timedCheck = checkForTimedStateChange m c wait
+                waited := timedCheck.Waited
+                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
             
-            override x.ToString() = if getNextWaiting() then "close w" else "close"}
+            override x.ToString() = toString "close" !waited}
 
-    let specLock = 
+    let specLock wait = 
+        let waited = ref false;
         { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Lock(); c
             member x.RunModel m = m.Lock(); m
 
             member x.Post (c,m) = 
-                let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+                let timedCheck = checkForTimedStateChange m c wait
+                waited := timedCheck.Waited
+                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
             
-            override x.ToString() = if getNextWaiting() then "lock w" else "lock"}
+            override x.ToString() = toString "lock" !waited}
 
-    let specUnlock = 
+    let specUnlock wait p = 
+        let waited = ref false;
         { new ICommand<AlarmSystem, AlarmSystem>() with
-            member x.Pre c = true
-            member x.RunActual c = c.Unlock("1234"); c
-            member x.RunModel m = m.Unlock("1234"); m
-            
+            member x.RunActual c = c.Unlock(p.ToString()); c
+            member x.RunModel m = m.Unlock(p.ToString()); m
             member x.Post (c,m) = 
-                let timedCheck = checkForTimedStateChange m c
-                (timedCheck && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+                let timedCheck = checkForTimedStateChange m c wait
+                waited := timedCheck.Waited
+                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
 
-            override x.ToString() = if getNextWaiting() then "unlock w" else "unlock"}
+            override x.ToString() = toString "unlock" !waited}
 
     { new ISpecification<AlarmSystem,AlarmSystem> with
       member x.Initial() = 
 
-        let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime) :> AlarmSystem
+        let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime, allowedWrongPinCodeCount) :> AlarmSystem
         alarmSystemImpl.StateChanged.Add(implementationEventHandler)
 
-        let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime) :> AlarmSystem
+        let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime, allowedWrongPinCodeCount) :> AlarmSystem
         alarmSystemModel.StateChanged.Add(modelEventHandler)
 
         (alarmSystemImpl, alarmSystemModel)
+        
+      member x.GenCommand _ = Gen.oneof [ gen {return getRandomShouldWait() |> specOpen};
+                                            gen {return getRandomShouldWait() |> specClose};
+                                            gen {return getRandomShouldWait() |> specLock};
+                                            gen {return getRandomPin() |> specUnlock (getRandomShouldWait())}] }
 
-      member x.GenCommand _ = Gen.elements [specOpen;specClose;specLock;specUnlock] }
+//let config = {
+//    Config.Quick with 
+//        MaxTest = 105
+//    }
 
 AlarmSystemImpl.ShutDownAll()
 //Check.Verbose(asProperty spec)
-Check.Quick(asProperty spec)
+Check.Quick (asProperty spec)
+//Check.One (config, (asProperty spec))
 AlarmSystemImpl.ShutDownAll()

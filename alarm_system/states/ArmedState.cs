@@ -10,27 +10,26 @@ namespace alarm_system.states
 {
     internal class ArmedState : AlarmSystemStateBase
     {
-        internal ArmedState(Context context)
+        internal ArmedState(Context context, int allowedWrongPinCodeCount)
             : base(context, AlarmSystemState.Armed)
         {
+            this.ALLOWED_WRONG_PIN_CODE_COUNT = allowedWrongPinCodeCount;
         }
 
         private int wrongPinCodeCounter = 0;
-
-        internal override void GotActive()
-        {
-            wrongPinCodeCounter = 0;
-        }
+        private readonly int ALLOWED_WRONG_PIN_CODE_COUNT;
 
         internal override void Unlock(string pinCode)
         {
-            wrongPinCodeCounter++;
-
             if (Context.checkPinCode(pinCode) == PinCheckResult.CORRECT)
             {
+                wrongPinCodeCounter = 0;
                 ChangeStateTo(AlarmSystemState.ClosedAndUnlocked);
+                return;
             }
-            else if (wrongPinCodeCounter >= 3)
+            
+            wrongPinCodeCounter++;    
+            if (wrongPinCodeCounter >= ALLOWED_WRONG_PIN_CODE_COUNT)
             {
                 ChangeStateTo(AlarmSystemState.AlarmFlashAndSound);
             }

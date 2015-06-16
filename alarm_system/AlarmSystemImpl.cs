@@ -18,6 +18,7 @@ namespace alarm_system
         private readonly int switchToArmedTime = 2000;
         private readonly int switchToFlashTime = 4000;
         private readonly int switchToSilentAndOpenTime = 5000;
+        private readonly int allowedWrongPinCodeCount = 3;
 
         private string alarmSystemPinCode = "1234";
 
@@ -26,11 +27,12 @@ namespace alarm_system
             initialize();
         }
 
-        public AlarmSystemImpl(int switchToArmedTime, int switchToFlashTime, int switchToSilentAndOpenTime)
+        public AlarmSystemImpl(int switchToArmedTime, int switchToFlashTime, int switchToSilentAndOpenTime, int allowedWrongPinCodeCount)
         {
             this.switchToArmedTime = switchToArmedTime;
             this.switchToFlashTime = switchToFlashTime;
             this.switchToSilentAndOpenTime = switchToSilentAndOpenTime;
+            this.allowedWrongPinCodeCount = allowedWrongPinCodeCount;
 
             initialize();
         }
@@ -44,7 +46,7 @@ namespace alarm_system
             AddState(new OpenAndLockedState(this));
             AddState(new ClosedAndUnlockedState(this));
             AddState(new ClosedAndLockedState(this, switchToArmedTime));
-            AddState(new ArmedState(this));
+            AddState(new ArmedState(this, allowedWrongPinCodeCount));
             AddState(new SilentAndOpenState(this));
             AddState(new AlarmFlashAndSoundState(this, switchToFlashTime));
             AddState(new AlarmFlashState(this, switchToSilentAndOpenTime));

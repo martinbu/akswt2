@@ -2,12 +2,17 @@
 
 open alarm_system_common
 
-type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime) = 
+type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime, allowedWrongPinCodeCount) = 
 
     let switchToArmedTime = switchToArmedTime
     let switchToFlashTime = switchToFlashTime
     let switchToSilentAndOpenTime = switchToSilentAndOpenTime
     let mutable currentState = AlarmSystemState.OpenAndUnlocked
+
+    let ALLOWED_WRONG_PIN_CODE_COUNT = allowedWrongPinCodeCount
+
+    let mutable alarmSystemPinCode = "1234"
+    let mutable wrongPinCodeCounter = 0;
 
     let stateChanged = new DelegateEvent<System.EventHandler<StateChangedEventArgs>>()
 
@@ -44,8 +49,13 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
 
         this.FireStateChangedEvent(oldState, newState)
 
+    member this.setStateWithPin newState pin =
+        if pin = alarmSystemPinCode then
+            this.setState newState
+
     member this.FireStateChangedEvent(oldState, newState) =
-        stateChanged.Trigger([|this; new StateChangedEventArgs(oldState, newState)|])
+        if oldState <> newState then
+            stateChanged.Trigger([|this; new StateChangedEventArgs(oldState, newState)|])
 
     interface AlarmSystem with
 
@@ -71,12 +81,20 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
     
         member this.Unlock(pinCode) =
             match currentState with
-            | AlarmSystemState.OpenAndLocked -> this.setState AlarmSystemState.OpenAndUnlocked
-            | AlarmSystemState.ClosedAndLocked -> this.setState AlarmSystemState.ClosedAndUnlocked
-            | AlarmSystemState.Armed -> this.setState AlarmSystemState.ClosedAndUnlocked
-            | AlarmSystemState.AlarmFlashAndSound -> this.setState AlarmSystemState.OpenAndUnlocked
-            | AlarmSystemState.AlarmFlash -> this.setState AlarmSystemState.OpenAndUnlocked
-            | AlarmSystemState.SilentAndOpen -> this.setState AlarmSystemState.OpenAndUnlocked
+            | AlarmSystemState.OpenAndLocked -> this.setStateWithPin AlarmSystemState.OpenAndUnlocked pinCode
+            | AlarmSystemState.ClosedAndLocked -> this.setStateWithPin AlarmSystemState.ClosedAndUnlocked pinCode
+            | AlarmSystemState.Armed -> 
+                if pinCode = alarmSystemPinCode then
+                    wrongPinCodeCounter <- 0
+                    this.setState AlarmSystemState.ClosedAndUnlocked
+                else
+                    wrongPinCodeCounter <- wrongPinCodeCounter + 1
+                    if wrongPinCodeCounter >= ALLOWED_WRONG_PIN_CODE_COUNT then
+                        this.setState AlarmSystemState.AlarmFlashAndSound
+
+            | AlarmSystemState.AlarmFlashAndSound -> this.setStateWithPin AlarmSystemState.OpenAndUnlocked pinCode
+            | AlarmSystemState.AlarmFlash -> this.setStateWithPin AlarmSystemState.OpenAndUnlocked pinCode
+            | AlarmSystemState.SilentAndOpen -> this.setStateWithPin AlarmSystemState.OpenAndUnlocked pinCode
             | _ -> ()
 
         member this.ShutDown() = 
