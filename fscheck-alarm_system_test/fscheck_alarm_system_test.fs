@@ -12,7 +12,6 @@ open alarm_system_model
 
 open System
 open System.Threading
-open FsCheck.Commands
 open System.Collections.Generic
 open System.Threading.Tasks
 
@@ -217,7 +216,7 @@ let spec =
         let model = ref -1
         let impl = ref -1
       
-        { new ICommand<AlarmSystem, AlarmSystem>() with
+        { new Command<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Open(); c
             member x.RunModel m = m.Open(); m
             member x.Post (c,m) = 
@@ -232,7 +231,7 @@ let spec =
     let specClose wait = 
         let waited = ref false;
       
-        { new ICommand<AlarmSystem, AlarmSystem>() with
+        { new Command<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Close(); c
             member x.RunModel m = m.Close(); m
             member x.Post (c,m) = 
@@ -246,7 +245,7 @@ let spec =
     let specLock wait = 
         let waited = ref false;
       
-        { new ICommand<AlarmSystem, AlarmSystem>() with
+        { new Command<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Lock(); c
             member x.RunModel m = m.Lock(); m
             member x.Post (c,m) = 
@@ -260,7 +259,7 @@ let spec =
     let specUnlock wait pinCode = 
         let waited = ref false;
 
-        { new ICommand<AlarmSystem, AlarmSystem>() with
+        { new Command<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Unlock(pinCode); c
             member x.RunModel m = m.Unlock(pinCode); m
             member x.Post (c,m) = 
@@ -273,7 +272,7 @@ let spec =
 
     let specSetPinCode pinCode newPinCode = 
         
-        { new ICommand<AlarmSystem, AlarmSystem>() with
+        { new Command<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.SetPinCode(pinCode, newPinCode); c
             member x.RunModel m = m.SetPinCode(pinCode, newPinCode); m
             member x.Post (c,m) = 
@@ -285,36 +284,42 @@ let spec =
 
             override x.ToString() = String.Concat [|"setPinCode("; pinCode; ","; newPinCode; ")" |] }
 
-    { new ISpecification<AlarmSystem,AlarmSystem> with
-      member x.Initial() = 
 
-        let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, 
-                                                    switchToSilentAndOpenTime, allowedWrongPinCodeCount,
-                                                    allowedWrongSetPinCodeCount) :> AlarmSystem
-        alarmSystemImpl.StateChanged.Add(implementationStateChangedEventHandler)
-        alarmSystemImpl.MessageArrived.Add(implMessageEventHandler)
+    { new ICommandGenerator<AlarmSystem,AlarmSystem> with
+        member __.InitialActual = 
+            let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, 50, 
+                                                        switchToSilentAndOpenTime, allowedWrongPinCodeCount,
+                                                        allowedWrongSetPinCodeCount) :> AlarmSystem
 
-        let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, 
+            clearAllStateChangedEvents()
+
+            alarmSystemImpl.StateChanged.Add(implementationStateChangedEventHandler)
+            alarmSystemImpl.MessageArrived.Add(implMessageEventHandler)
+            
+            alarmSystemImpl
+
+        member __.InitialModel = 
+            let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, 
                                                     switchToSilentAndOpenTime, allowedWrongPinCodeCount, 
                                                     allowedWrongSetPinCodeCount) :> AlarmSystem
 
-        alarmSystemModel.StateChanged.Add(modelStateChangedEventHandler)
-        alarmSystemModel.MessageArrived.Add(modelMessageEventHandler)        
+            clearAllStateChangedEvents()
 
-        clearAllStateChangedEvents()
+            alarmSystemModel.StateChanged.Add(modelStateChangedEventHandler)
+            alarmSystemModel.MessageArrived.Add(modelMessageEventHandler) 
+            alarmSystemModel  
 
-        (alarmSystemImpl, alarmSystemModel)
-        
-      member x.GenCommand _ = Gen.oneof [ gen {return getRandomShouldWait(2) |> specOpen};
+        member __.Next model = Gen.oneof [ gen {return getRandomShouldWait(2) |> specOpen};
                                             gen {return getRandomShouldWait(3) |> specClose};
                                             gen {return getRandomShouldWait(4) |> specLock};
                                             gen {return getRandomPin(8) |> specUnlock (getRandomShouldWait(5))};
                                             gen {return getRandomPin(9) |> specSetPinCode (getRandomPin(6))} ] }
 
-//let config = {
-//    Config.Quick with 
-//        MaxTest = 5000
-//    }
+
+let config = {
+    Config.Quick with 
+        MaxTest = 200
+    }
 
 //let config = {
 //    Config.Quick with 
@@ -323,7 +328,7 @@ let spec =
 
 AlarmSystemImpl.ShutDownAll()
 //Check.Verbose(asProperty spec)
-Check.Quick (asProperty spec)
+Check.One(config, (Command.toProperty spec))
 //Check.One (config, (asProperty spec))
 AlarmSystemImpl.ShutDownAll()
 
