@@ -287,7 +287,7 @@ let spec =
 
     { new ICommandGenerator<AlarmSystem,AlarmSystem> with
         member __.InitialActual = 
-            let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, 50, 
+            let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, 30, 
                                                         switchToSilentAndOpenTime, allowedWrongPinCodeCount,
                                                         allowedWrongSetPinCodeCount) :> AlarmSystem
 
@@ -318,7 +318,7 @@ let spec =
 
 let config = {
     Config.Quick with 
-        MaxTest = 200
+        MaxTest = 100
     }
 
 //let config = {
