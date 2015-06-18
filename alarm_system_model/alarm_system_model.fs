@@ -1,8 +1,17 @@
 ﻿namespace alarm_system_model
 
 open alarm_system_common
+open System.Collections.Generic
 
-type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime, allowedWrongPinCodeCount) = 
+type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime, allowedWrongPinCodeCount, allowedWrongSetPinCodeCount) as this = 
+    
+    static let alarmSystems = new List<AlarmSystem>()
+    static let ShutDownAll() = 
+        alarmSystems.ForEach(fun e -> e.ShutDown())
+        alarmSystems.Clear()
+    
+    do ShutDownAll()
+    do alarmSystems.Add(this)
 
     let switchToArmedTime = switchToArmedTime
     let switchToFlashTime = switchToFlashTime
@@ -10,12 +19,15 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
     let mutable currentState = AlarmSystemState.OpenAndUnlocked
 
     let ALLOWED_WRONG_PIN_CODE_COUNT = allowedWrongPinCodeCount
+    let ALLOWED_WRONG_SET_PIN_CODE_COUNT = allowedWrongSetPinCodeCount
 
     let mutable alarmSystemPinCode = "1234"
     let mutable wrongPinCodeCounter = 0;
+    let mutable wrongSetPinCodeCounter = 0;
 
     let stateChanged = new DelegateEvent<System.EventHandler<StateChangedEventArgs>>()
-
+    let messageArrived = new DelegateEvent<System.EventHandler<string>>()
+    
     member this.asyncSwitchToState fromState switchTime toState = async {
             do! Async.Sleep(switchTime) 
             if fromState = currentState then 
@@ -57,6 +69,9 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
         if oldState <> newState then
             stateChanged.Trigger([|this; new StateChangedEventArgs(oldState, newState)|])
 
+    member this.FireMessageEvent(message : string) =
+        messageArrived.Trigger([|this; message|])
+
     interface AlarmSystem with
 
         member this.Open() = 
@@ -97,10 +112,27 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
             | AlarmSystemState.SilentAndOpen -> this.setStateWithPin AlarmSystemState.OpenAndUnlocked pinCode
             | _ -> ()
 
+
+        member this.SetPinCode(pinCode, newPinCode) =
+            if currentState <> AlarmSystemState.ClosedAndUnlocked && currentState <> AlarmSystemState.OpenAndUnlocked then
+                ()
+            else if pinCode = alarmSystemPinCode then
+                wrongSetPinCodeCounter <- 0
+                alarmSystemPinCode <- newPinCode
+                this.FireMessageEvent("newPinSet")
+            else
+                wrongSetPinCodeCounter <- wrongSetPinCodeCounter + 1
+                if wrongSetPinCodeCounter >= ALLOWED_WRONG_SET_PIN_CODE_COUNT then
+                    this.setState AlarmSystemState.AlarmFlashAndSound
+            
+
         member this.ShutDown() = 
             Async.CancelDefaultToken()
 
         [<CLIEvent>]
         member this.StateChanged = stateChanged.Publish
+
+        [<CLIEvent>]
+        member this.MessageArrived = messageArrived.Publish
 
         member this.CurrentState with get () = currentState

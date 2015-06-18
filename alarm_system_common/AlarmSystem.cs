@@ -11,6 +11,7 @@ namespace alarm_system_common
         AlarmSystemState CurrentState { get; }
 
         event EventHandler<StateChangedEventArgs> StateChanged;
+        event EventHandler<string> MessageArrived;
 
         void Open();
 
@@ -19,6 +20,8 @@ namespace alarm_system_common
         void Lock();
 
         void Unlock(string pinCode);
+
+        void SetPinCode(string pinCode, string newPinCode);
 
         void ShutDown();
     }

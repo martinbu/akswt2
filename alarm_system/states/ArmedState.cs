@@ -21,7 +21,7 @@ namespace alarm_system.states
 
         internal override void Unlock(string pinCode)
         {
-            if (Context.checkPinCode(pinCode) == PinCheckResult.CORRECT)
+            if (Context.CheckPinCode(pinCode) == PinCheckResult.CORRECT)
             {
                 wrongPinCodeCounter = 0;
                 ChangeStateTo(AlarmSystemState.ClosedAndUnlocked);

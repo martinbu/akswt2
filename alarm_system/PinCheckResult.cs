@@ -9,6 +9,7 @@ namespace alarm_system
     internal enum PinCheckResult
     {
         CORRECT,
-        INCORRECT
+        INCORRECT,
+        ALARM
     }
 }

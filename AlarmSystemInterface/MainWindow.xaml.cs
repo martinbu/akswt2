@@ -31,10 +31,19 @@ namespace AlarmSystemInterface
             InitializeComponent();
             DataContext = this;
 
-            alarmSystem = new AlarmSystemImpl(2000, 4000, 5000, 3);
+            alarmSystem = new AlarmSystemImpl(2000, 4000, 5000, 3,3);
             alarmSystem.StateChanged += alarmSystem_StateChanged;
+            alarmSystem.MessageArrived += alarmSystem_MessageArrived;
             AlarmSystemState = alarmSystem.CurrentState.ToString();
             AlarmSystemPin = "####";
+            NewAlarmSystemPin = "4321";
+        }
+
+        async void alarmSystem_MessageArrived(object sender, string message)
+        {
+            NewPinSet = message;
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            NewPinSet = "";
         }
 
         void alarmSystem_StateChanged(object sender, StateChangedEventArgs e)
@@ -62,9 +71,9 @@ namespace AlarmSystemInterface
             alarmSystem.Unlock(AlarmSystemPin);
         }
 
-        private String _AlarmSystemState;
+        private string _AlarmSystemState;
 
-        public String AlarmSystemState
+        public string AlarmSystemState
         {
             get { return _AlarmSystemState; }
             set 
@@ -82,9 +91,35 @@ namespace AlarmSystemInterface
             set
             { 
                 _AlarmSystemPin = value;
-                NotifyChange("_AlarmSystemPin");
+                NotifyChange("AlarmSystemPin");
             }
         }
+
+        private string _NewAlarmSystemPin;
+
+        public string NewAlarmSystemPin
+        {
+            get { return _NewAlarmSystemPin; }
+            set
+            {
+                _NewAlarmSystemPin = value;
+                NotifyChange("NewAlarmSystemPin");
+            }
+        }
+
+        private string _NewPinSet;
+
+        public string NewPinSet
+        {
+            get { return _NewPinSet; }
+            set 
+            { 
+                _NewPinSet = value;
+                NotifyChange("NewPinSet");
+            }
+        }
+
+
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -92,6 +127,11 @@ namespace AlarmSystemInterface
         {
             if (PropertyChanged != null)
                 PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void SetNewPinCode_Click(object sender, RoutedEventArgs e)
+        {
+            alarmSystem.SetPinCode(AlarmSystemPin, NewAlarmSystemPin);
         }
     }
 }

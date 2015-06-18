@@ -23,5 +23,18 @@ namespace alarm_system.states
         {
             base.ChangeStateTo(AlarmSystemState.OpenAndLocked);
         }
+
+        internal override void SetPinCode(string pinCode, string newPinCode)
+        {
+            switch (Context.SetPinCode(pinCode, newPinCode))
+            {
+                case PinCheckResult.CORRECT:
+                    Context.SendMessage("newPinSet");
+                    break;
+                case PinCheckResult.ALARM:
+                    base.ChangeStateTo(AlarmSystemState.AlarmFlashAndSound);
+                    break;
+            }
+        }
     }
 }

@@ -18,26 +18,33 @@ namespace alarm_system
         private readonly int switchToArmedTime = 2000;
         private readonly int switchToFlashTime = 4000;
         private readonly int switchToSilentAndOpenTime = 5000;
-        private readonly int allowedWrongPinCodeCount = 3;
+        private readonly int ALLOWED_WRONG_PIN_CODE_COUNT = 3;
+        private readonly int ALLOWED_WRONG_SET_PIN_CODE_COUNT = 3;
+
+        private int wrongSetPinCodeCounter = 0;
 
         private string alarmSystemPinCode = "1234";
 
+        #region initialization
+
         public AlarmSystemImpl()
         {
-            initialize();
+            Initialize();
         }
 
-        public AlarmSystemImpl(int switchToArmedTime, int switchToFlashTime, int switchToSilentAndOpenTime, int allowedWrongPinCodeCount)
+        public AlarmSystemImpl(int switchToArmedTime, int switchToFlashTime, 
+            int switchToSilentAndOpenTime, int allowedWrongPinCodeCount, int allowedWrongSetPinCodeCount)
         {
             this.switchToArmedTime = switchToArmedTime;
             this.switchToFlashTime = switchToFlashTime;
             this.switchToSilentAndOpenTime = switchToSilentAndOpenTime;
-            this.allowedWrongPinCodeCount = allowedWrongPinCodeCount;
+            this.ALLOWED_WRONG_PIN_CODE_COUNT = allowedWrongPinCodeCount;
+            this.ALLOWED_WRONG_SET_PIN_CODE_COUNT = allowedWrongSetPinCodeCount;
 
-            initialize();
+            Initialize();
         }
 
-        private void initialize() {
+        private void Initialize() {
 
             ShutDownAll();
             
@@ -46,7 +53,7 @@ namespace alarm_system
             AddState(new OpenAndLockedState(this));
             AddState(new ClosedAndUnlockedState(this));
             AddState(new ClosedAndLockedState(this, switchToArmedTime));
-            AddState(new ArmedState(this, allowedWrongPinCodeCount));
+            AddState(new ArmedState(this, ALLOWED_WRONG_PIN_CODE_COUNT));
             AddState(new SilentAndOpenState(this));
             AddState(new AlarmFlashAndSoundState(this, switchToFlashTime));
             AddState(new AlarmFlashState(this, switchToSilentAndOpenTime));
@@ -55,6 +62,11 @@ namespace alarm_system
 
             initializedAlarmSystem.Add(this);
         }
+
+        #endregion
+
+
+        #region AlarmSystem
 
         public AlarmSystemState CurrentState { get; private set; }
 
@@ -78,6 +90,25 @@ namespace alarm_system
             AlarmSystemStates[CurrentState].Unlock(pinCode);
         }
 
+        public void SetPinCode(string pinCode, string newPinCode)
+        {
+            AlarmSystemStates[CurrentState].SetPinCode(pinCode, newPinCode);
+        }
+
+        public event EventHandler<StateChangedEventArgs> StateChanged;
+        public event EventHandler<string> MessageArrived;
+
+
+        public void ShutDown()
+        {
+            AlarmSystemStates.Values.ToList().ForEach(e => e.ShutDown());
+        }
+
+        #endregion
+
+
+        #region Context
+
         public void ChangeState(AlarmSystemState oldStateType, AlarmSystemState newStateType)
         {
             if (oldStateType == newStateType)
@@ -92,7 +123,15 @@ namespace alarm_system
             }
         }
 
-        PinCheckResult Context.checkPinCode(string pinCode)
+        public void SendMessage(string message)
+        {
+            if (MessageArrived != null)
+            {
+                MessageArrived(this, message);
+            }
+        }
+
+        PinCheckResult Context.CheckPinCode(string pinCode)
         {
             if (pinCode == this.alarmSystemPinCode)
                 return PinCheckResult.CORRECT;
@@ -100,19 +139,28 @@ namespace alarm_system
             return PinCheckResult.INCORRECT;
         }
 
+        PinCheckResult Context.SetPinCode(string pinCode, string newPinCode)
+        {
+            if ((this as Context).CheckPinCode(pinCode) == PinCheckResult.CORRECT)
+            {
+                wrongSetPinCodeCounter = 0;
+                this.alarmSystemPinCode = newPinCode;
+                return PinCheckResult.CORRECT;
+            }
+
+            wrongSetPinCodeCounter++;
+
+            if (wrongSetPinCodeCounter >= ALLOWED_WRONG_SET_PIN_CODE_COUNT)
+                return PinCheckResult.ALARM;
+
+            return PinCheckResult.INCORRECT;
+        }
+
+        #endregion
 
         private void AddState(AlarmSystemStateBase alarmSystemState)
         {
             AlarmSystemStates.Add(alarmSystemState.StateType, alarmSystemState);
-        }
-
-
-        public event EventHandler<StateChangedEventArgs> StateChanged;
-
-
-        public void ShutDown()
-        {
-            AlarmSystemStates.Values.ToList().ForEach(e => e.ShutDown());
         }
 
         public static void ShutDownAll()

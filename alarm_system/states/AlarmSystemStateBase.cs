@@ -26,7 +26,7 @@ namespace alarm_system.states
 
         protected void ChangeStateToWithPin(AlarmSystemState newStateType, string pinCode)
         {
-            if (Context.checkPinCode(pinCode) == PinCheckResult.CORRECT)
+            if (Context.CheckPinCode(pinCode) == PinCheckResult.CORRECT)
             {
                 Context.ChangeState(this.StateType, newStateType);
             }
@@ -55,6 +55,11 @@ namespace alarm_system.states
         internal virtual void Unlock(string pin)
         {
             //Console.WriteLine(this.GetType().Name + " has no Unlock Command. Ignore.");
+        }
+
+        internal virtual void SetPinCode(string pinCode, string newPinCode)
+        {
+
         }
 
         internal virtual void ShutDown()

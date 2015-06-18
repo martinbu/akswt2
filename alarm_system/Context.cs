@@ -11,7 +11,9 @@ namespace alarm_system
     internal interface Context
     {
         void ChangeState(AlarmSystemState oldStateType, AlarmSystemState newStateType);
+        void SendMessage(string message);
 
-        PinCheckResult checkPinCode(string pinCode);
+        PinCheckResult CheckPinCode(string pinCode);
+        PinCheckResult SetPinCode(string pinCode, string newPinCode);
     }
 }

@@ -14,17 +14,19 @@ open System
 open System.Threading
 open FsCheck.Commands
 open System.Collections.Generic
+open System.Threading.Tasks
 
 //type AlarmSystemState = OpenAndUnlocked | ClosedAndUnlocked | OpenAndLocked
 //                        | ClosedAndLocked | Armed | SilentAndOpen | AlarmFlashAndSound | AlarmFlash
 
 let switchToArmedTime = 20
 let switchToFlashTime = 40
-let switchToSilentAndOpenTime = 80
-let allowedWrongPinCodeCount = 3;
+let switchToSilentAndOpenTime = 100
+let allowedWrongPinCodeCount = 3
+let allowedWrongSetPinCodeCount = 3
 
-let DELTA_COMPARE = 5
-let DELTA_WAIT = 15
+let DELTA_COMPARE = TimeSpan.FromMilliseconds(2.)
+let DELTA_WAIT = 5
 
 [<Struct>]
 type StateChangedEvent =
@@ -36,169 +38,287 @@ type WaitResult =
     { isOK : bool; 
       Waited : bool }
 
+type StateChangedEvents =
+    { Current : StateChangedEvent;
+      Before : StateChangedEvent }
+
+type MIStateChangedEvents =
+    { Model : StateChangedEvents;
+      Impl : StateChangedEvents}
+
 // ----------------------------------------------------------------------------------
+
+let monitor = new Object()
+
+//let modelEventWait = new AutoResetEvent(false)
+//let implEventWait = new AutoResetEvent(false)
 
 let implEventList = new Stack<StateChangedEvent>()
 let modelEventList = new Stack<StateChangedEvent>()
 
-let implementationEventHandler (args : StateChangedEventArgs) = 
-    lock implEventList
-        (fun () -> implEventList.Push(new StateChangedEvent(args, DateTime.Now)))
+let implementationStateChangedEventHandler (args : StateChangedEventArgs) = 
+    let now = DateTime.Now
+    do (now |> ignore)
+    
+    //printfn "impleventhandler: new: %s | old: %s at %d " (args.NewStateType.ToString()) (args.OldStateType.ToString()) now.Ticks
+    lock monitor
+        (fun () -> implEventList.Push(new StateChangedEvent(args, now)); Monitor.Pulse(monitor) |> ignore )
 
-let modelEventHandler (args : StateChangedEventArgs) = 
-    lock modelEventList
-        (fun () -> modelEventList.Push(new StateChangedEvent(args, DateTime.Now)))
+let modelStateChangedEventHandler (args : StateChangedEventArgs) = 
+    let now = DateTime.Now
+    do (now |> ignore)
 
-let popModelEvent() =
-    lock modelEventList (fun () -> modelEventList.Pop())        
+    //printfn "modeleventhandler: new: %s | old: %s at %d " (args.NewStateType.ToString()) (args.OldStateType.ToString()) now.Ticks
+    
+    lock monitor
+        (fun () -> modelEventList.Push(new StateChangedEvent(args, now)); Monitor.Pulse(monitor) |> ignore )
 
-let popImplEvent() =
-    lock implEventList (fun () -> implEventList.Pop())
+let popImplStateChangedEvents() =
+    lock implEventList 
+        (fun () -> { Current = implEventList.Peek(); Before = implEventList.Peek() } )
 
-let clearAll() =
-    lock modelEventList (fun () -> modelEventList.Clear())        
-    lock implEventList (fun () -> implEventList.Clear())
+let popModelStateChangedEvents() =
+    lock modelEventList 
+        (fun () -> { Current = modelEventList.Peek(); Before = modelEventList.Peek() } )
+
+let clearAllStateChangedEvents() =
+    lock monitor (fun () -> modelEventList.Clear(); implEventList.Clear())        
 
 // ----------------------------------------------------------------------------------
 
-let compareTime (time1 : TimeSpan) (time2 : TimeSpan)=
+let implMessageList = new Stack<string>()
+let modelMessageList = new Stack<string>()
+
+let modelMessageEventHandler (message : string) =
+    lock modelMessageList
+        (fun () -> modelMessageList.Push(message))
+
+let implMessageEventHandler (message : string) =
+    lock implMessageList
+        (fun () -> implMessageList.Push(message))
+
+let empty = "<empty>"
+
+let popModelMessage() =
+    lock modelMessageList 
+        (fun () -> if modelMessageList.Count = 0 then empty else modelMessageList.Pop())
+
+let popImplMessage() =
+    lock implMessageList 
+        (fun () -> if implMessageList.Count = 0 then empty else implMessageList.Pop())
+
+let clearMessages() =
+    lock implMessageList 
+        (fun () -> implMessageList.Clear())
+    lock modelMessageList 
+        (fun () -> modelMessageList.Clear())
+
+// ----------------------------------------------------------------------------------
+
+let compareTime (time1 : TimeSpan) (time2 : TimeSpan) (modelEvents :StateChangedEvents) (implEvents :StateChangedEvents) =
     let diff = (time1 - time2)
 
-    if -DELTA_COMPARE <= diff.Milliseconds && diff.Milliseconds <= DELTA_COMPARE then 
+    if -DELTA_COMPARE <= diff && diff <= DELTA_COMPARE then 
         true
     else 
-        printfn "The time needed for the state switch was too big: %d" diff.Milliseconds
+        printfn "The time needed for the state switch was too big: %f | %s | %s" diff.TotalMilliseconds (modelEvents.Current.State.NewStateType.ToString()) (implEvents.Current.State.NewStateType.ToString())
         false
 
 // ----------------------------------------------------------------------------------
 
-let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) timeToWait = 
-    let fromState = model.CurrentState
+let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) (timeToWait : int) fromState = 
+    System.Threading.Thread.Sleep(timeToWait)
+    
+//    let wait = async {
+//        WaitHandle.WaitAll([|modelEventWait :> WaitHandle; implEventWait :> WaitHandle|], timeToWait) |> ignore}
+//
+//    let task = Async.StartAsTask(wait, TaskCreationOptions.None, new CancellationToken())
+//    task.Wait()
 
-    System.Threading.Thread.Sleep(timeToWait + DELTA_WAIT)
+//    WaitHandle.WaitAny([|modelEventWait :> WaitHandle|], timeToWait + DELTA_WAIT) |> ignore
+//    WaitHandle.WaitAny([|implEventWait :> WaitHandle |], DELTA_WAIT) |> ignore
 
-    let currentModelEvent = popModelEvent()
-    let beforeModelEvent = popModelEvent()
+//    let implEvents = popImplStateChangedEvents()
+//    let modelEvents = popModelStateChangedEvents()
 
-    let currentImplEvent = popImplEvent()
-    let beforeImplEvent = popImplEvent()
+    let r = lock monitor
+                (fun () -> 
+                    let mutable tries = 5
+                    //printfn "init: m: %d | i: %d" (modelEventList.Count) (implEventList.Count)
+                    while implEventList.Count <> modelEventList.Count && tries > 0 do
+                        Monitor.Wait(monitor, DELTA_WAIT) |> ignore
+                        tries <- tries - 1
 
-    let isTimeDiffOk = compareTime (currentModelEvent.Time - beforeModelEvent.Time) (currentImplEvent.Time - beforeImplEvent.Time)
+                    if implEventList.Count <> modelEventList.Count then
+                        printfn "------->>>> we have a different count of events, there must someting wrong with the timing!!!"
 
-    if beforeModelEvent.State.NewStateType = beforeImplEvent.State.NewStateType
-        && currentModelEvent.State.NewStateType = currentImplEvent.State.NewStateType
+                    {Model = popModelStateChangedEvents(); Impl = popImplStateChangedEvents()})
+
+    let implEvents = r.Impl
+    let modelEvents = r.Model
+   
+    let isTimeDiffOk = compareTime (modelEvents.Current.Time - modelEvents.Before.Time) 
+                                   (implEvents.Current.Time - implEvents.Before.Time) modelEvents implEvents
+
+    if modelEvents.Before.State.NewStateType = implEvents.Before.State.NewStateType
+        && modelEvents.Current.State.NewStateType = implEvents.Current.State.NewStateType
         && isTimeDiffOk then
         {WaitResult.isOK = true; WaitResult.Waited = true}
     else
         {WaitResult.isOK = false; WaitResult.Waited = true}
 
-let rnd = System.Random(DateTime.Now.Millisecond)
 
 let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) wait = 
 
+    let currentState = model.CurrentState
+
     if not wait then
-        {WaitResult.isOK = true; WaitResult.Waited = false}
+        {WaitResult.isOK = (model.CurrentState = impl.CurrentState); WaitResult.Waited = false}
 
     else
+        
         let timeToWait =
-            match model.CurrentState with
+            match currentState with
             | AlarmSystemState.ClosedAndLocked -> Some switchToArmedTime
             | AlarmSystemState.AlarmFlashAndSound -> Some switchToFlashTime
             | AlarmSystemState.AlarmFlash -> Some switchToSilentAndOpenTime
             | _ -> None
 
         if timeToWait.IsSome then
-            waitAndCheckTimedEvent model impl timeToWait.Value
+            waitAndCheckTimedEvent model impl timeToWait.Value currentState
         else
-            {WaitResult.isOK = true; WaitResult.Waited = false}
+            {WaitResult.isOK = (model.CurrentState = impl.CurrentState); WaitResult.Waited = false}
 
 // ----------------------------------------------------------------------------------
 
-let pinGenerator = Gen.frequency [ (1, (Gen.sized <| fun s -> Gen.choose (0,9999)) ); (1, gen { return 1234 })]
-let getRandomPin () = (Gen.sample 1 1 (pinGenerator)).Head
+let pinGenerator = Gen.oneof [ Gen.choose (0,9999); gen { return 1234 }]
+let getRandomPin seed = (Gen.sample 0 seed (pinGenerator)).Head.ToString()
 
 let waitGenerator = Gen.oneof [ gen { return true }; gen { return false }]
-let getRandomShouldWait () = (waitGenerator |> Gen.sample 1 1).Head
+let getRandomShouldWait seed = (waitGenerator |> Gen.sample 0 seed).Head
 
-let getRandomShouldWait1 () = (waitGenerator |> Gen.sample 1 1).Head
-
-let toString text wait = 
+let printWaitedIfNeed text wait = 
     if wait then
         text + "-w"
     else
         text
         
+let getDebugString called waited = 
+    (printWaitedIfNeed called waited) //+ "[" + model.ToString() + "|" + impl.ToString() + "]"
+
+let getDebugStringWithPin called waited pin =
+    (printWaitedIfNeed called waited) + "(" + pin + ")" //+ "[" + model.ToString() + "|" + impl.ToString() + "]"
+
 // ----------------------------------------------------------------------------------
 let spec =
 
     let specOpen wait =
         let waited = ref false;
+        let model = ref -1
+        let impl = ref -1
+      
         { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Open(); c
             member x.RunModel m = m.Open(); m
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c wait
                 waited := timedCheck.Waited
-                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
 
-            override x.ToString() = toString "open" !waited}
+                timedCheck.isOK |> Prop.ofTestable
+
+            override x.ToString() = getDebugString "open" !waited}
+            
 
     let specClose wait = 
         let waited = ref false;
+      
         { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Close(); c
             member x.RunModel m = m.Close(); m
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c wait
                 waited := timedCheck.Waited
-                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+
+                timedCheck.isOK |> Prop.ofTestable
             
-            override x.ToString() = toString "close" !waited}
+            override x.ToString() = getDebugString "close" !waited}
 
     let specLock wait = 
         let waited = ref false;
+      
         { new ICommand<AlarmSystem, AlarmSystem>() with
             member x.RunActual c = c.Lock(); c
             member x.RunModel m = m.Lock(); m
-
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c wait
                 waited := timedCheck.Waited
-                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+
+                timedCheck.isOK |> Prop.ofTestable
             
-            override x.ToString() = toString "lock" !waited}
+            override x.ToString() = getDebugString "lock" !waited }
 
-    let specUnlock wait p = 
+    let specUnlock wait pinCode = 
         let waited = ref false;
+
         { new ICommand<AlarmSystem, AlarmSystem>() with
-            member x.RunActual c = c.Unlock(p.ToString()); c
-            member x.RunModel m = m.Unlock(p.ToString()); m
+            member x.RunActual c = c.Unlock(pinCode); c
+            member x.RunModel m = m.Unlock(pinCode); m
             member x.Post (c,m) = 
                 let timedCheck = checkForTimedStateChange m c wait
                 waited := timedCheck.Waited
-                (timedCheck.isOK && m.CurrentState = c.CurrentState) |> Prop.ofTestable
 
-            override x.ToString() = toString "unlock" !waited}
+                timedCheck.isOK |> Prop.ofTestable
+            
+            override x.ToString() = getDebugStringWithPin "unlock" !waited pinCode}
+
+    let specSetPinCode pinCode newPinCode = 
+        
+        { new ICommand<AlarmSystem, AlarmSystem>() with
+            member x.RunActual c = c.SetPinCode(pinCode, newPinCode); c
+            member x.RunModel m = m.SetPinCode(pinCode, newPinCode); m
+            member x.Post (c,m) = 
+                let modelMessage = popModelMessage()
+                let implMessage = popImplMessage()
+                clearMessages()
+                
+                (modelMessage = implMessage && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+
+            override x.ToString() = String.Concat [|"setPinCode("; pinCode; ","; newPinCode; ")" |] }
 
     { new ISpecification<AlarmSystem,AlarmSystem> with
       member x.Initial() = 
 
-        let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime, allowedWrongPinCodeCount) :> AlarmSystem
-        alarmSystemImpl.StateChanged.Add(implementationEventHandler)
+        let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, 
+                                                    switchToSilentAndOpenTime, allowedWrongPinCodeCount,
+                                                    allowedWrongSetPinCodeCount) :> AlarmSystem
+        alarmSystemImpl.StateChanged.Add(implementationStateChangedEventHandler)
+        alarmSystemImpl.MessageArrived.Add(implMessageEventHandler)
 
-        let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpenTime, allowedWrongPinCodeCount) :> AlarmSystem
-        alarmSystemModel.StateChanged.Add(modelEventHandler)
+        let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, 
+                                                    switchToSilentAndOpenTime, allowedWrongPinCodeCount, 
+                                                    allowedWrongSetPinCodeCount) :> AlarmSystem
+
+        alarmSystemModel.StateChanged.Add(modelStateChangedEventHandler)
+        alarmSystemModel.MessageArrived.Add(modelMessageEventHandler)        
+
+        clearAllStateChangedEvents()
 
         (alarmSystemImpl, alarmSystemModel)
         
-      member x.GenCommand _ = Gen.oneof [ gen {return getRandomShouldWait() |> specOpen};
-                                            gen {return getRandomShouldWait() |> specClose};
-                                            gen {return getRandomShouldWait() |> specLock};
-                                            gen {return getRandomPin() |> specUnlock (getRandomShouldWait())}] }
+      member x.GenCommand _ = Gen.oneof [ gen {return getRandomShouldWait(2) |> specOpen};
+                                            gen {return getRandomShouldWait(3) |> specClose};
+                                            gen {return getRandomShouldWait(4) |> specLock};
+                                            gen {return getRandomPin(8) |> specUnlock (getRandomShouldWait(5))};
+                                            gen {return getRandomPin(9) |> specSetPinCode (getRandomPin(6))} ] }
 
 //let config = {
 //    Config.Quick with 
-//        MaxTest = 105
+//        MaxTest = 5000
+//    }
+
+//let config = {
+//    Config.Quick with 
+//        Replay = Random.StdGen (154938806,296021545) |> Some 
 //    }
 
 AlarmSystemImpl.ShutDownAll()
@@ -206,3 +326,5 @@ AlarmSystemImpl.ShutDownAll()
 Check.Quick (asProperty spec)
 //Check.One (config, (asProperty spec))
 AlarmSystemImpl.ShutDownAll()
+
+
