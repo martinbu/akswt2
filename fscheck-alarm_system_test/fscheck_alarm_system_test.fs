@@ -18,13 +18,13 @@ open System.Threading.Tasks
 //type AlarmSystemState = OpenAndUnlocked | ClosedAndUnlocked | OpenAndLocked
 //                        | ClosedAndLocked | Armed | SilentAndOpen | AlarmFlashAndSound | AlarmFlash
 
-let switchToArmedTime = 20
-let switchToFlashTime = 40
-let switchToSilentAndOpenTime = 100
+let switchToArmedTime = 40
+let switchToFlashTime = 80
+let switchToSilentAndOpenTime = 180
 let allowedWrongPinCodeCount = 3
 let allowedWrongSetPinCodeCount = 3
 
-let DELTA_COMPARE = TimeSpan.FromMilliseconds(2.)
+let DELTA_COMPARE = TimeSpan.FromMilliseconds(5.)
 let DELTA_WAIT = 5
 
 [<Struct>]
@@ -52,33 +52,30 @@ let monitor = new Object()
 //let modelEventWait = new AutoResetEvent(false)
 //let implEventWait = new AutoResetEvent(false)
 
-let implEventList = new Stack<StateChangedEvent>()
-let modelEventList = new Stack<StateChangedEvent>()
+let implEventList = new List<StateChangedEvent>()
+let modelEventList = new List<StateChangedEvent>()
 
 let implementationStateChangedEventHandler (args : StateChangedEventArgs) = 
     let now = DateTime.Now
-    do (now |> ignore)
-    
-    //printfn "impleventhandler: new: %s | old: %s at %d " (args.NewStateType.ToString()) (args.OldStateType.ToString()) now.Ticks
     lock monitor
-        (fun () -> implEventList.Push(new StateChangedEvent(args, now)); Monitor.Pulse(monitor) |> ignore )
+        (fun () -> implEventList.Add(new StateChangedEvent(args, now)); Monitor.Pulse(monitor) |> ignore )
 
 let modelStateChangedEventHandler (args : StateChangedEventArgs) = 
     let now = DateTime.Now
-    do (now |> ignore)
-
-    //printfn "modeleventhandler: new: %s | old: %s at %d " (args.NewStateType.ToString()) (args.OldStateType.ToString()) now.Ticks
-    
     lock monitor
-        (fun () -> modelEventList.Push(new StateChangedEvent(args, now)); Monitor.Pulse(monitor) |> ignore )
+        (fun () -> modelEventList.Add(new StateChangedEvent(args, now)); Monitor.Pulse(monitor) |> ignore )
 
-let popImplStateChangedEvents() =
-    lock implEventList 
-        (fun () -> { Current = implEventList.Peek(); Before = implEventList.Peek() } )
+let getLastImplStateChangedEvents() =
+    if implEventList.Count < 2 then
+        { Current = implEventList.Item(implEventList.Count - 1); Before = implEventList.Item(implEventList.Count - 1) }
+    else
+        { Current = implEventList.Item(implEventList.Count - 1); Before = implEventList.Item(implEventList.Count - 2) }
 
-let popModelStateChangedEvents() =
-    lock modelEventList 
-        (fun () -> { Current = modelEventList.Peek(); Before = modelEventList.Peek() } )
+let getLastModelStateChangedEvents() =
+    if modelEventList.Count < 2 then
+        { Current = modelEventList.Item(implEventList.Count - 1); Before = modelEventList.Item(implEventList.Count - 1) } 
+    else
+        { Current = modelEventList.Item(implEventList.Count - 1); Before = modelEventList.Item(implEventList.Count - 2) }
 
 let clearAllStateChangedEvents() =
     lock monitor (fun () -> modelEventList.Clear(); implEventList.Clear())        
@@ -116,6 +113,7 @@ let clearMessages() =
 
 let compareTime (time1 : TimeSpan) (time2 : TimeSpan) (modelEvents :StateChangedEvents) (implEvents :StateChangedEvents) =
     let diff = (time1 - time2)
+    //printfn "time difference: %f" diff
 
     if -DELTA_COMPARE <= diff && diff <= DELTA_COMPARE then 
         true
@@ -151,10 +149,12 @@ let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) (timeToWai
                     if implEventList.Count <> modelEventList.Count then
                         printfn "------->>>> we have a different count of events, there must someting wrong with the timing!!!"
 
-                    {Model = popModelStateChangedEvents(); Impl = popImplStateChangedEvents()})
+                    {Model = getLastModelStateChangedEvents(); Impl = getLastImplStateChangedEvents()})
 
     let implEvents = r.Impl
     let modelEvents = r.Model
+
+    //printfn "times: %d %d %d %d" modelEvents.Current.Time.Ticks modelEvents.Before.Time.Ticks implEvents.Current.Time.Ticks implEvents.Before.Time.Ticks
    
     let isTimeDiffOk = compareTime (modelEvents.Current.Time - modelEvents.Before.Time) 
                                    (implEvents.Current.Time - implEvents.Before.Time) modelEvents implEvents
@@ -287,7 +287,7 @@ let spec =
 
     { new ICommandGenerator<AlarmSystem,AlarmSystem> with
         member __.InitialActual = 
-            let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, 30, 
+            let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, 
                                                         switchToSilentAndOpenTime, allowedWrongPinCodeCount,
                                                         allowedWrongSetPinCodeCount) :> AlarmSystem
 
@@ -318,18 +318,12 @@ let spec =
 
 let config = {
     Config.Quick with 
-        MaxTest = 100
+        MaxTest = 300
+        Replay = Random.StdGen (1547734458,296022012) |> Some 
     }
-
-//let config = {
-//    Config.Quick with 
-//        Replay = Random.StdGen (154938806,296021545) |> Some 
-//    }
 
 AlarmSystemImpl.ShutDownAll()
 //Check.Verbose(asProperty spec)
-Check.One(config, (Command.toProperty spec))
-//Check.One (config, (asProperty spec))
+//Check.One(config, (Command.toProperty spec))
+Check.Quick (Command.toProperty spec)
 AlarmSystemImpl.ShutDownAll()
-
-
