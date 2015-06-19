@@ -15,17 +15,18 @@ open System.Threading
 open System.Collections.Generic
 open System.Threading.Tasks
 
+
 //type AlarmSystemState = OpenAndUnlocked | ClosedAndUnlocked | OpenAndLocked
 //                        | ClosedAndLocked | Armed | SilentAndOpen | AlarmFlashAndSound | AlarmFlash
 
 let switchToArmedTime = 40
 let switchToFlashTime = 80
-let switchToSilentAndOpenTime = 180
+let switchToSilentAndOpenTime = 120
 let allowedWrongPinCodeCount = 3
 let allowedWrongSetPinCodeCount = 3
 
-let DELTA_COMPARE = TimeSpan.FromMilliseconds(5.)
-let DELTA_WAIT = 5
+let DELTA_COMPARE = TimeSpan.FromMilliseconds(15.)
+let DELTA_WAIT = 10
 
 [<Struct>]
 type StateChangedEvent =
@@ -77,8 +78,11 @@ let getLastModelStateChangedEvents() =
     else
         { Current = modelEventList.Item(implEventList.Count - 1); Before = modelEventList.Item(implEventList.Count - 2) }
 
-let clearAllStateChangedEvents() =
-    lock monitor (fun () -> modelEventList.Clear(); implEventList.Clear())        
+let clearModelEvents() = 
+    lock monitor (fun () -> modelEventList.Clear())
+
+let clearImplEvents() =
+    lock monitor (fun () -> implEventList.Clear())        
 
 // ----------------------------------------------------------------------------------
 
@@ -103,9 +107,11 @@ let popImplMessage() =
     lock implMessageList 
         (fun () -> if implMessageList.Count = 0 then empty else implMessageList.Pop())
 
-let clearMessages() =
+let clearImplMessages() =
     lock implMessageList 
         (fun () -> implMessageList.Clear())
+
+let clearModelMessages() =
     lock modelMessageList 
         (fun () -> modelMessageList.Clear())
 
@@ -140,31 +146,40 @@ let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) (timeToWai
 
     let r = lock monitor
                 (fun () -> 
-                    let mutable tries = 5
+                    let mutable tries = 10
                     //printfn "init: m: %d | i: %d" (modelEventList.Count) (implEventList.Count)
                     while implEventList.Count <> modelEventList.Count && tries > 0 do
                         Monitor.Wait(monitor, DELTA_WAIT) |> ignore
                         tries <- tries - 1
 
                     if implEventList.Count <> modelEventList.Count then
-                        printfn "------->>>> we have a different count of events, there must someting wrong with the timing!!!"
+                        printfn "------->>>> we have a different count of events, 
+                            there must someting wrong with the timing!!! impl events: %d, model events: %d" 
+                            implEventList.Count modelEventList.Count
+                        None
+                    else
+                        Some {Model = getLastModelStateChangedEvents(); Impl = getLastImplStateChangedEvents()})
 
-                    {Model = getLastModelStateChangedEvents(); Impl = getLastImplStateChangedEvents()})
-
-    let implEvents = r.Impl
-    let modelEvents = r.Model
-
-    //printfn "times: %d %d %d %d" modelEvents.Current.Time.Ticks modelEvents.Before.Time.Ticks implEvents.Current.Time.Ticks implEvents.Before.Time.Ticks
-   
-    let isTimeDiffOk = compareTime (modelEvents.Current.Time - modelEvents.Before.Time) 
-                                   (implEvents.Current.Time - implEvents.Before.Time) modelEvents implEvents
-
-    if modelEvents.Before.State.NewStateType = implEvents.Before.State.NewStateType
-        && modelEvents.Current.State.NewStateType = implEvents.Current.State.NewStateType
-        && isTimeDiffOk then
-        {WaitResult.isOK = true; WaitResult.Waited = true}
-    else
+    if (r.IsNone) then
         {WaitResult.isOK = false; WaitResult.Waited = true}
+    else
+        let implEvents = r.Value.Impl
+        let modelEvents = r.Value.Model
+
+        //printfn "times: %d %d %d %d" modelEvents.Current.Time.Ticks modelEvents.Before.Time.Ticks implEvents.Current.Time.Ticks implEvents.Before.Time.Ticks
+   
+        let isTimeDiffOk = compareTime (modelEvents.Current.Time - modelEvents.Before.Time) 
+                                       (implEvents.Current.Time - implEvents.Before.Time) modelEvents implEvents
+
+        if modelEvents.Before.State.NewStateType = implEvents.Before.State.NewStateType
+            && modelEvents.Current.State.NewStateType = implEvents.Current.State.NewStateType
+            && isTimeDiffOk then
+            {WaitResult.isOK = true; WaitResult.Waited = true}
+        else
+            printfn "wrong state or time after wait before model: %s, before impl: %s, new model: %s, new impl: %s" 
+                (modelEvents.Before.State.NewStateType.ToString()) (implEvents.Before.State.NewStateType.ToString())
+                (modelEvents.Current.State.NewStateType.ToString()) (implEvents.Current.State.NewStateType.ToString())
+            {WaitResult.isOK = false; WaitResult.Waited = true}
 
 
 let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) wait = 
@@ -172,7 +187,10 @@ let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) wait =
     let currentState = model.CurrentState
 
     if not wait then
-        {WaitResult.isOK = (model.CurrentState = impl.CurrentState); WaitResult.Waited = false}
+        let result = (model.CurrentState = impl.CurrentState)
+        if not result then
+            printfn "wrong state in not wait m: %s, i: %s" (model.CurrentState.ToString()) (impl.CurrentState.ToString())
+        {WaitResult.isOK = result; WaitResult.Waited = false}
 
     else
         
@@ -186,7 +204,10 @@ let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) wait =
         if timeToWait.IsSome then
             waitAndCheckTimedEvent model impl timeToWait.Value currentState
         else
-            {WaitResult.isOK = (model.CurrentState = impl.CurrentState); WaitResult.Waited = false}
+            let result = (model.CurrentState = impl.CurrentState)
+            if not result then
+                printfn "wrong state m: %s, i: %s" (model.CurrentState.ToString()) (impl.CurrentState.ToString())
+            {WaitResult.isOK = result; WaitResult.Waited = false}
 
 // ----------------------------------------------------------------------------------
 
@@ -276,11 +297,18 @@ let spec =
             member x.RunActual c = c.SetPinCode(pinCode, newPinCode); c
             member x.RunModel m = m.SetPinCode(pinCode, newPinCode); m
             member x.Post (c,m) = 
+                let result = m.CurrentState = c.CurrentState
                 let modelMessage = popModelMessage()
                 let implMessage = popImplMessage()
-                clearMessages()
-                
-                (modelMessage = implMessage && m.CurrentState = c.CurrentState) |> Prop.ofTestable
+                clearModelMessages()
+                clearImplMessages()
+
+                if (modelMessage <> implMessage) then
+                    printfn "message not equal! %s %s" modelMessage implMessage
+
+                if not result then
+                    printfn "wrong state m: %s, i: %s" (m.CurrentState.ToString()) (c.CurrentState.ToString())
+                (modelMessage = implMessage && result) |> Prop.ofTestable
 
             override x.ToString() = String.Concat [|"setPinCode("; pinCode; ","; newPinCode; ")" |] }
 
@@ -290,20 +318,19 @@ let spec =
             let alarmSystemImpl = new AlarmSystemImpl(switchToArmedTime, switchToFlashTime, 
                                                         switchToSilentAndOpenTime, allowedWrongPinCodeCount,
                                                         allowedWrongSetPinCodeCount) :> AlarmSystem
-
-            clearAllStateChangedEvents()
+            clearImplEvents()
+            clearImplMessages()
 
             alarmSystemImpl.StateChanged.Add(implementationStateChangedEventHandler)
             alarmSystemImpl.MessageArrived.Add(implMessageEventHandler)
-            
             alarmSystemImpl
 
         member __.InitialModel = 
             let alarmSystemModel = new AlarmSystemModel(switchToArmedTime, switchToFlashTime, 
                                                     switchToSilentAndOpenTime, allowedWrongPinCodeCount, 
                                                     allowedWrongSetPinCodeCount) :> AlarmSystem
-
-            clearAllStateChangedEvents()
+            clearModelEvents()
+            clearModelMessages()
 
             alarmSystemModel.StateChanged.Add(modelStateChangedEventHandler)
             alarmSystemModel.MessageArrived.Add(modelMessageEventHandler) 
@@ -312,18 +339,27 @@ let spec =
         member __.Next model = Gen.oneof [ gen {return getRandomShouldWait(2) |> specOpen};
                                             gen {return getRandomShouldWait(3) |> specClose};
                                             gen {return getRandomShouldWait(4) |> specLock};
-                                            gen {return getRandomPin(8) |> specUnlock (getRandomShouldWait(5))};
+                                            gen {return getRandomPin(8) |> specUnlock (getRandomShouldWait(5))};//]}
                                             gen {return getRandomPin(9) |> specSetPinCode (getRandomPin(6))} ] }
 
 
 let config = {
     Config.Quick with 
-        MaxTest = 300
-        Replay = Random.StdGen (1547734458,296022012) |> Some 
+        MaxTest = 5000
+        //Replay = Random.StdGen (1812709121,296022046) |> Some 
     }
 
-AlarmSystemImpl.ShutDownAll()
+//Check.One(config, Command.toProperty spec)
+
+open NUnit.Framework
+open Swensen.Unquote
+[<Test>]
+let ``Alarm System Test``() =
+    Check.QuickThrowOnFailure (Command.toProperty spec)
+
+
+
 //Check.Verbose(asProperty spec)
 //Check.One(config, (Command.toProperty spec))
-Check.Quick (Command.toProperty spec)
-AlarmSystemImpl.ShutDownAll()
+
+
