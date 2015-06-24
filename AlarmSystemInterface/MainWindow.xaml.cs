@@ -31,7 +31,7 @@ namespace AlarmSystemInterface
             InitializeComponent();
             DataContext = this;
 
-            alarmSystem = new AlarmSystemImpl(2000, 4000, 5000, 3,3);
+            alarmSystem = new AlarmSystemModel(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(4), 3, 3);
             alarmSystem.StateChanged += alarmSystem_StateChanged;
             alarmSystem.MessageArrived += alarmSystem_MessageArrived;
             AlarmSystemState = alarmSystem.CurrentState.ToString();

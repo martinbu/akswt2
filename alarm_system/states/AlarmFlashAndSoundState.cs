@@ -10,16 +10,15 @@ namespace alarm_system.states
 {
     internal class AlarmFlashAndSoundState : AlarmSystemStateBase
     {
-        private readonly int switchToFlashTime;
+        private CancellationTokenSource cancelAlarm = null;
+        private readonly TimeSpan switchToFlashTime;
 
-        internal AlarmFlashAndSoundState(Context context, int switchToFlashTime)
+        internal AlarmFlashAndSoundState(Context context, TimeSpan switchToFlashTime)
             : base(context, AlarmSystemState.AlarmFlashAndSound)
         {
             this.switchToFlashTime = switchToFlashTime;
             CancelAlarm();
         }
-
-        private CancellationTokenSource cancelAlarm = null;
 
         internal override void Unlock(string pinCode)
         {
@@ -39,7 +38,7 @@ namespace alarm_system.states
         private async void turnOffSound()
         {
             try {
-                await Task.Delay(TimeSpan.FromMilliseconds(switchToFlashTime), cancelAlarm.Token);
+                await Task.Delay(switchToFlashTime, cancelAlarm.Token);
                 ChangeStateTo(AlarmSystemState.AlarmFlash);
             }
             catch (TaskCanceledException) { }

@@ -15,9 +15,9 @@ namespace alarm_system
 
         private static List<AlarmSystem> initializedAlarmSystem = new List<AlarmSystem>();
 
-        private readonly int switchToArmedTime = 2000;
-        private readonly int switchToFlashTime = 4000;
-        private readonly int switchToSilentAndOpenTime = 5000;
+        private readonly TimeSpan switchToArmedTime = TimeSpan.FromSeconds(2);
+        private readonly TimeSpan switchToFlashTime = TimeSpan.FromSeconds(4);
+        private readonly TimeSpan switchToSilentAndOpenTime = TimeSpan.FromSeconds(5);
         private readonly int ALLOWED_WRONG_PIN_CODE_COUNT = 3;
         private readonly int ALLOWED_WRONG_SET_PIN_CODE_COUNT = 3;
 
@@ -32,8 +32,8 @@ namespace alarm_system
             Initialize();
         }
 
-        public AlarmSystemImpl(int switchToArmedTime, int switchToFlashTime, 
-            int switchToSilentAndOpenTime, int allowedWrongPinCodeCount, int allowedWrongSetPinCodeCount)
+        public AlarmSystemImpl(TimeSpan switchToArmedTime, TimeSpan switchToFlashTime, 
+            TimeSpan switchToSilentAndOpenTime, int allowedWrongPinCodeCount, int allowedWrongSetPinCodeCount)
         {
             this.switchToArmedTime = switchToArmedTime;
             this.switchToFlashTime = switchToFlashTime;
@@ -43,7 +43,7 @@ namespace alarm_system
 
             Initialize();
         }
-
+        
         private void Initialize() {
 
             ShutDownAll();
@@ -101,6 +101,7 @@ namespace alarm_system
 
         public void ShutDown()
         {
+            StateChanged = null;
             AlarmSystemStates.Values.ToList().ForEach(e => e.ShutDown());
         }
 
@@ -119,7 +120,7 @@ namespace alarm_system
 
             if (StateChanged != null)
             {
-                StateChanged(this, new StateChangedEventArgs(oldStateType, newStateType));
+                StateChanged(this, new StateChangedEventArgs(oldStateType, newStateType, this));
             }
         }
 
@@ -166,9 +167,16 @@ namespace alarm_system
         public static void ShutDownAll()
         {
             //Console.WriteLine("Shut down '{0}' AlarmSystems", initializedAlarmSystem.Count);
+            
             initializedAlarmSystem.ForEach(e => e.ShutDown());
 
             initializedAlarmSystem.Clear();
+        }
+
+        Guid guid = Guid.NewGuid();
+        public Guid UniqueId()
+        {
+            return guid;
         }
     }
 }

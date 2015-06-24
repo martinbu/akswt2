@@ -10,11 +10,13 @@ namespace alarm_system_common
     {
         public AlarmSystemState OldStateType { get; private set; }
         public AlarmSystemState NewStateType { get; private set; }
+        public AlarmSystem system;
 
-        public StateChangedEventArgs(AlarmSystemState oldStateType, AlarmSystemState newStateType)
+        public StateChangedEventArgs(AlarmSystemState oldStateType, AlarmSystemState newStateType, AlarmSystem system)
         {
             this.OldStateType = oldStateType;
             this.NewStateType = newStateType;
+            this.system = system;
         }
  
     }

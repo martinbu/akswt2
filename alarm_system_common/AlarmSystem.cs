@@ -19,6 +19,8 @@ namespace alarm_system_common
 
         void Lock();
 
+        Guid UniqueId();
+
         void Unlock(string pinCode);
 
         void SetPinCode(string pinCode, string newPinCode);

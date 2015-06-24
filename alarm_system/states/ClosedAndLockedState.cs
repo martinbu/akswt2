@@ -10,16 +10,15 @@ namespace alarm_system.states
 {
     internal class ClosedAndLockedState : AlarmSystemStateBase
     {
-        private readonly int switchToArmedTime;
+        private CancellationTokenSource cancelArmedActivation = null;
+        private readonly TimeSpan switchToArmedTime;
 
-        internal ClosedAndLockedState(Context context, int switchToArmedTime)
+        internal ClosedAndLockedState(Context context, TimeSpan switchToArmedTime)
             : base(context, AlarmSystemState.ClosedAndLocked)
         {
             this.switchToArmedTime = switchToArmedTime;
             CancelArmedActivation();
         }
-
-        private CancellationTokenSource cancelArmedActivation = null;
 
         internal override void Unlock(string pinCode)
         {
@@ -46,7 +45,7 @@ namespace alarm_system.states
         {
             try
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(switchToArmedTime), cancelArmedActivation.Token);
+                await Task.Delay(switchToArmedTime, cancelArmedActivation.Token);
                 ChangeStateTo(AlarmSystemState.Armed);
             }
             catch (TaskCanceledException) { }

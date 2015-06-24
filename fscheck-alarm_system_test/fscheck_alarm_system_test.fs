@@ -19,14 +19,14 @@ open System.Threading.Tasks
 //type AlarmSystemState = OpenAndUnlocked | ClosedAndUnlocked | OpenAndLocked
 //                        | ClosedAndLocked | Armed | SilentAndOpen | AlarmFlashAndSound | AlarmFlash
 
-let switchToArmedTime = 40
-let switchToFlashTime = 80
-let switchToSilentAndOpenTime = 120
+let switchToArmedTime = TimeSpan.FromMilliseconds(80.)
+let switchToFlashTime = TimeSpan.FromMilliseconds(200.)
+let switchToSilentAndOpenTime = TimeSpan.FromMilliseconds(300.)
 let allowedWrongPinCodeCount = 3
 let allowedWrongSetPinCodeCount = 3
 
-let DELTA_COMPARE = TimeSpan.FromMilliseconds(15.)
-let DELTA_WAIT = 10
+let DELTA_COMPARE = TimeSpan.FromMilliseconds(20.)
+let DELTA_WAIT = 300
 
 [<Struct>]
 type StateChangedEvent =
@@ -74,9 +74,25 @@ let getLastImplStateChangedEvents() =
 
 let getLastModelStateChangedEvents() =
     if modelEventList.Count < 2 then
-        { Current = modelEventList.Item(implEventList.Count - 1); Before = modelEventList.Item(implEventList.Count - 1) } 
+        { Current = modelEventList.Item(modelEventList.Count - 1); Before = modelEventList.Item(modelEventList.Count - 1) } 
     else
-        { Current = modelEventList.Item(implEventList.Count - 1); Before = modelEventList.Item(implEventList.Count - 2) }
+        { Current = modelEventList.Item(modelEventList.Count - 1); Before = modelEventList.Item(modelEventList.Count - 2) }
+
+let getLastImplStateChangedEventTime() =
+    lock monitor
+        (fun() -> 
+            if implEventList.Count = 0 then
+                new DateTime(int64 0)
+            else
+                implEventList.Item(implEventList.Count - 1).Time)
+
+let getLastModelStateChangedEventTime() =
+    lock monitor
+        (fun() -> 
+            if modelEventList.Count = 0 then
+                new DateTime(int64 0)
+            else
+                modelEventList.Item(modelEventList.Count - 1).Time)
 
 let clearModelEvents() = 
     lock monitor (fun () -> modelEventList.Clear())
@@ -129,8 +145,9 @@ let compareTime (time1 : TimeSpan) (time2 : TimeSpan) (modelEvents :StateChanged
 
 // ----------------------------------------------------------------------------------
 
-let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) (timeToWait : int) fromState = 
-    System.Threading.Thread.Sleep(timeToWait)
+let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) (timeToWait : TimeSpan) fromState = 
+    if timeToWait.TotalMilliseconds > 0. then
+        System.Threading.Thread.Sleep((int timeToWait.TotalMilliseconds))
     
 //    let wait = async {
 //        WaitHandle.WaitAll([|modelEventWait :> WaitHandle; implEventWait :> WaitHandle|], timeToWait) |> ignore}
@@ -156,6 +173,11 @@ let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) (timeToWai
                         printfn "------->>>> we have a different count of events, 
                             there must someting wrong with the timing!!! impl events: %d, model events: %d" 
                             implEventList.Count modelEventList.Count
+
+                        modelEventList.ForEach( fun e -> printf "m: %s | o: %s" (e.State.NewStateType.ToString()) (e.State.system.UniqueId().ToString()) )
+                        printfn("----------------------------------------")
+                        implEventList.ForEach( fun e -> printf "i: %s | o: %s" (e.State.NewStateType.ToString()) (e.State.system.UniqueId().ToString()))
+                        printfn("========================================")
                         None
                     else
                         Some {Model = getLastModelStateChangedEvents(); Impl = getLastImplStateChangedEvents()})
@@ -183,22 +205,40 @@ let waitAndCheckTimedEvent (model : AlarmSystem) (impl : AlarmSystem) (timeToWai
 
 
 let checkForTimedStateChange (model : AlarmSystem) (impl : AlarmSystem) wait = 
-
     let currentState = model.CurrentState
 
     if not wait then
-        let result = (model.CurrentState = impl.CurrentState)
+        let mutable result = (model.CurrentState = impl.CurrentState)
+        if not result then
+            Thread.Sleep(1)
+            result <- (model.CurrentState = impl.CurrentState)
+
         if not result then
             printfn "wrong state in not wait m: %s, i: %s" (model.CurrentState.ToString()) (impl.CurrentState.ToString())
         {WaitResult.isOK = result; WaitResult.Waited = false}
 
     else
+
+        
         
         let timeToWait =
+
+//            let lastModelEventTime = getLastModelStateChangedEventTime()
+//            let lastImplEventTime = getLastImplStateChangedEventTime()
+//
+//            let lastEventTime = if lastModelEventTime < lastImplEventTime then lastImplEventTime else lastModelEventTime
+//            let alreadyWaited = DateTime.Now - lastEventTime
+//
+//            if alreadyWaited.TotalMilliseconds < 0. then
+//                printfn "------------ negative wait time!!!"
+
             match currentState with
             | AlarmSystemState.ClosedAndLocked -> Some switchToArmedTime
+                //Some (switchToArmedTime - alreadyWaited)
             | AlarmSystemState.AlarmFlashAndSound -> Some switchToFlashTime
+                //Some (switchToFlashTime - alreadyWaited)
             | AlarmSystemState.AlarmFlash -> Some switchToSilentAndOpenTime
+                //Some (switchToSilentAndOpenTime - alreadyWaited)
             | _ -> None
 
         if timeToWait.IsSome then
@@ -238,6 +278,13 @@ let spec =
         let impl = ref -1
       
         { new Command<AlarmSystem, AlarmSystem>() with
+//            member x.Pre m = 
+//                match m.CurrentState with
+//                | AlarmSystemState.ClosedAndUnlocked -> true
+//                | AlarmSystemState.ClosedAndLocked -> true
+//                | AlarmSystemState.Armed -> true
+//                | _ -> false
+
             member x.RunActual c = c.Open(); c
             member x.RunModel m = m.Open(); m
             member x.Post (c,m) = 
@@ -253,6 +300,13 @@ let spec =
         let waited = ref false;
       
         { new Command<AlarmSystem, AlarmSystem>() with
+//            member x.Pre m = 
+//                match m.CurrentState with
+//                | AlarmSystemState.OpenAndUnlocked -> true
+//                | AlarmSystemState.OpenAndLocked -> true
+//                | AlarmSystemState.SilentAndOpen -> true
+//                | _ -> false
+
             member x.RunActual c = c.Close(); c
             member x.RunModel m = m.Close(); m
             member x.Post (c,m) = 
@@ -267,6 +321,12 @@ let spec =
         let waited = ref false;
       
         { new Command<AlarmSystem, AlarmSystem>() with
+//            member x.Pre m = 
+//                match m.CurrentState with
+//                | AlarmSystemState.OpenAndUnlocked -> true
+//                | AlarmSystemState.ClosedAndUnlocked -> true
+//                | _ -> false
+
             member x.RunActual c = c.Lock(); c
             member x.RunModel m = m.Lock(); m
             member x.Post (c,m) = 
@@ -281,6 +341,16 @@ let spec =
         let waited = ref false;
 
         { new Command<AlarmSystem, AlarmSystem>() with
+//            member x.Pre m = 
+//                match m.CurrentState with
+//                | AlarmSystemState.OpenAndLocked -> true
+//                | AlarmSystemState.ClosedAndLocked -> true
+//                | AlarmSystemState.Armed -> true
+//                | AlarmSystemState.AlarmFlashAndSound -> true
+//                | AlarmSystemState.AlarmFlash -> true
+//                | AlarmSystemState.SilentAndOpen -> true
+//                | _ -> false
+
             member x.RunActual c = c.Unlock(pinCode); c
             member x.RunModel m = m.Unlock(pinCode); m
             member x.Post (c,m) = 
@@ -294,6 +364,12 @@ let spec =
     let specSetPinCode pinCode newPinCode = 
         
         { new Command<AlarmSystem, AlarmSystem>() with
+//            member x.Pre m = 
+//                match m.CurrentState with
+//                | AlarmSystemState.OpenAndUnlocked -> true
+//                | AlarmSystemState.ClosedAndUnlocked -> true
+//                | _ -> false
+
             member x.RunActual c = c.SetPinCode(pinCode, newPinCode); c
             member x.RunModel m = m.SetPinCode(pinCode, newPinCode); m
             member x.Post (c,m) = 
@@ -350,6 +426,7 @@ let config = {
     }
 
 //Check.One(config, Command.toProperty spec)
+//Check.Quick(Command.toProperty spec)
 
 open NUnit.Framework
 open Swensen.Unquote

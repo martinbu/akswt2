@@ -1,5 +1,6 @@
 ﻿namespace alarm_system_model
 
+open System
 open alarm_system_common
 open System.Collections.Generic
 
@@ -24,42 +25,42 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
     let mutable alarmSystemPinCode = "1234"
     let mutable wrongPinCodeCounter = 0;
     let mutable wrongSetPinCodeCounter = 0;
+    let guid = Guid.NewGuid()
 
     let stateChanged = new DelegateEvent<System.EventHandler<StateChangedEventArgs>>()
     let messageArrived = new DelegateEvent<System.EventHandler<string>>()
     
-    member this.asyncSwitchToState fromState switchTime toState = async {
-            do! Async.Sleep(switchTime) 
-            if fromState = currentState then 
+    member this.asyncSwitchToState fromState (switchTime : TimeSpan) toState = async {
+            do! Async.Sleep(int switchTime.TotalMilliseconds) 
+            if not Async.DefaultCancellationToken.IsCancellationRequested then 
                 this.setState toState
         }
 
     member this.asyncSwitchTimedToArmed fromState =
-        Async.CancelDefaultToken()
         ignore (Async.Start ((this.asyncSwitchToState fromState switchToArmedTime AlarmSystemState.Armed), Async.DefaultCancellationToken))
 
     member this.asyncSwitchTimedToFlash fromState =
-        Async.CancelDefaultToken()
         ignore (Async.Start ((this.asyncSwitchToState fromState switchToFlashTime AlarmSystemState.AlarmFlash), Async.DefaultCancellationToken))
 
     member this.asyncSwitchTimedToSilentAndOpen fromState =
-        Async.CancelDefaultToken()
         ignore (Async.Start ((this.asyncSwitchToState fromState switchToSilentAndOpenTime AlarmSystemState.SilentAndOpen), Async.DefaultCancellationToken))
 
     override this.ToString() = currentState.ToString()
 
     member this.setState newState =
-        Async.CancelDefaultToken()
         let oldState = currentState
-        currentState <- newState
+        
+        if oldState <> newState then
+            Async.CancelDefaultToken()
+        
+            currentState <- newState
+            this.FireStateChangedEvent(oldState, newState)
 
-        match currentState with
-        | AlarmSystemState.ClosedAndLocked -> this.asyncSwitchTimedToArmed currentState
-        | AlarmSystemState.AlarmFlashAndSound -> this.asyncSwitchTimedToFlash currentState
-        | AlarmSystemState.AlarmFlash -> this.asyncSwitchTimedToSilentAndOpen currentState
-        | _ -> ()
-
-        this.FireStateChangedEvent(oldState, newState)
+            match currentState with
+            | AlarmSystemState.ClosedAndLocked -> this.asyncSwitchTimedToArmed currentState
+            | AlarmSystemState.AlarmFlashAndSound -> this.asyncSwitchTimedToFlash currentState
+            | AlarmSystemState.AlarmFlash -> this.asyncSwitchTimedToSilentAndOpen currentState
+            | _ -> ()
 
     member this.setStateWithPin newState pin =
         if pin = alarmSystemPinCode then
@@ -67,7 +68,7 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
 
     member this.FireStateChangedEvent(oldState, newState) =
         if oldState <> newState then
-            stateChanged.Trigger([|this; new StateChangedEventArgs(oldState, newState)|])
+            stateChanged.Trigger([|this; new StateChangedEventArgs(oldState, newState, this)|])
 
     member this.FireMessageEvent(message : string) =
         messageArrived.Trigger([|this; message|])
@@ -136,3 +137,6 @@ type AlarmSystemModel(switchToArmedTime, switchToFlashTime, switchToSilentAndOpe
         member this.MessageArrived = messageArrived.Publish
 
         member this.CurrentState with get () = currentState
+
+        member this.UniqueId() = guid
+            
